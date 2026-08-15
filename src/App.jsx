@@ -14,6 +14,9 @@ const C = {
 };
 
 const LOOKING_FOR = ["Relation sérieuse", "Amitié", "Je découvre"];
+const EDUCATION_LEVELS = ["Secondaire", "Collégial / DEC", "Baccalauréat", "Maîtrise", "Doctorat", "Formation professionnelle"];
+const HAS_CHILDREN_OPTIONS = ["Oui", "Non"];
+const MAX_PHOTOS = 6;
 
 function matchKey(a, b) {
   return [a, b].sort().join("__");
@@ -72,8 +75,6 @@ export default function App() {
   const [messageDraft, setMessageDraft] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [avatarFile, setAvatarFile] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [blockPairs, setBlockPairs] = useState([]); // [{from_id, to_id}] — blocages faits par moi
   const [menuOpenFor, setMenuOpenFor] = useState(null); // id du profil dont le menu ⋮ est ouvert
@@ -81,27 +82,51 @@ export default function App() {
   const [reportReason, setReportReason] = useState("");
   const [reportSending, setReportSending] = useState(false);
 
+  // Photos multiples — création de profil
+  const [photoFiles, setPhotoFiles] = useState([]); // File[]
+  const [photoPreviews, setPhotoPreviews] = useState([]); // dataURL[]
+
+  // Photos multiples — indexées par profil, pour l'affichage (discover, etc.)
+  const [profilePhotos, setProfilePhotos] = useState({}); // { [profileId]: [{id, url, position}] }
+  const [cardPhotoIdx, setCardPhotoIdx] = useState({}); // { [profileId]: index affiché }
+
+  // Édition de profil existant
+  const [editForm, setEditForm] = useState(null);
+  const [existingPhotos, setExistingPhotos] = useState([]); // photos déjà enregistrées, en édition
+  const [newPhotoFiles, setNewPhotoFiles] = useState([]);
+  const [newPhotoPreviews, setNewPhotoPreviews] = useState([]);
+  const [savingProfile, setSavingProfile] = useState(false);
+
   const [form, setForm] = useState({
     name: "", age: "", country: "", languages: "", city: "",
     arrivedSince: "", lookingFor: LOOKING_FOR[0], bio: "",
+    occupation: "", interests: "", educationLevel: EDUCATION_LEVELS[0], hasChildren: HAS_CHILDREN_OPTIONS[1],
   });
 
   const loadAll = useCallback(async () => {
     try {
-      const [profRes, likeRes, passRes, blockRes] = await Promise.all([
+      const [profRes, likeRes, passRes, blockRes, photoRes] = await Promise.all([
         supabase.from("profiles").select("*").order("created_at", { ascending: true }),
         supabase.from("likes").select("from_id,to_id"),
         supabase.from("passes").select("from_id,to_id"),
         supabase.from("blocks").select("from_id,to_id"),
+        supabase.from("profile_photos").select("*").order("position", { ascending: true }),
       ]);
       if (profRes.error) throw profRes.error;
       if (likeRes.error) throw likeRes.error;
       if (passRes.error) throw passRes.error;
       if (blockRes.error) throw blockRes.error;
+      if (photoRes.error) throw photoRes.error;
       setProfiles(profRes.data || []);
       setLikePairs(likeRes.data || []);
       setPassPairs(passRes.data || []);
       setBlockPairs(blockRes.data || []);
+      const grouped = {};
+      (photoRes.data || []).forEach((ph) => {
+        if (!grouped[ph.profile_id]) grouped[ph.profile_id] = [];
+        grouped[ph.profile_id].push(ph);
+      });
+      setProfilePhotos(grouped);
     } catch (e) {
       console.error(e);
       setError("Impossible de charger les données. Réessaie.");
@@ -205,18 +230,9 @@ export default function App() {
     }
   }
 
-  function handleAvatarFileChange(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setAvatarFile(file);
-    const reader = new FileReader();
-    reader.onload = () => setAvatarPreview(reader.result);
-    reader.readAsDataURL(file);
-  }
-
-  async function uploadAvatar(userId, file) {
+  async function uploadPhoto(userId, file, idx = 0) {
     const ext = file.name.split(".").pop();
-    const path = `${userId}/avatar-${Date.now()}.${ext}`;
+    const path = `${userId}/photo-${Date.now()}-${idx}.${ext}`;
     const { error: uploadError } = await supabase.storage
       .from("avatars")
       .upload(path, file, { upsert: true });
@@ -225,26 +241,150 @@ export default function App() {
     return data.publicUrl;
   }
 
-  async function handleAvatarUpdate(e) {
-    const file = e.target.files?.[0];
-    if (!file || !currentUser || !session) return;
-    setUploadingAvatar(true);
+  // ---- Sélection de photos pendant la création du profil ----
+  function handlePhotosSelected(e) {
+    const room = MAX_PHOTOS - photoFiles.length;
+    const files = Array.from(e.target.files || []).slice(0, Math.max(room, 0));
+    if (files.length === 0) return;
+    setPhotoFiles((prev) => [...prev, ...files].slice(0, MAX_PHOTOS));
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => setPhotoPreviews((prev) => [...prev, reader.result].slice(0, MAX_PHOTOS));
+      reader.readAsDataURL(file);
+    });
+    e.target.value = "";
+  }
+
+  function removePhotoFile(idx) {
+    setPhotoFiles((prev) => prev.filter((_, i) => i !== idx));
+    setPhotoPreviews((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  // ---- Carrousel de photos (cartes discover / matches) ----
+  function nextCardPhoto(profileId, total, ev) {
+    if (ev) ev.stopPropagation();
+    setCardPhotoIdx((m) => ({ ...m, [profileId]: ((m[profileId] || 0) + 1) % total }));
+  }
+  function prevCardPhoto(profileId, total, ev) {
+    if (ev) ev.stopPropagation();
+    setCardPhotoIdx((m) => ({ ...m, [profileId]: ((m[profileId] || 0) - 1 + total) % total }));
+  }
+
+  // ---- Édition de profil existant ----
+  function openEditProfile() {
+    if (!currentUser) return;
+    setEditForm({
+      name: currentUser.name || "",
+      age: String(currentUser.age || ""),
+      country: currentUser.country || "",
+      languages: currentUser.languages || "",
+      city: currentUser.city || "",
+      arrivedSince: currentUser.arrived_since || "",
+      lookingFor: currentUser.looking_for || LOOKING_FOR[0],
+      bio: currentUser.bio || "",
+      occupation: currentUser.occupation || "",
+      interests: currentUser.interests || "",
+      educationLevel: currentUser.education_level || EDUCATION_LEVELS[0],
+      hasChildren: currentUser.has_children || HAS_CHILDREN_OPTIONS[1],
+    });
+    setExistingPhotos(profilePhotos[currentUser.id] || []);
+    setNewPhotoFiles([]);
+    setNewPhotoPreviews([]);
+    setMenuOpenFor(null);
+    setView("editProfile");
+  }
+
+  function handleNewPhotosSelected(e) {
+    const total = existingPhotos.length + newPhotoFiles.length;
+    const room = MAX_PHOTOS - total;
+    const files = Array.from(e.target.files || []).slice(0, Math.max(room, 0));
+    if (files.length === 0) return;
+    setNewPhotoFiles((prev) => [...prev, ...files]);
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => setNewPhotoPreviews((prev) => [...prev, reader.result]);
+      reader.readAsDataURL(file);
+    });
+    e.target.value = "";
+  }
+
+  function removeNewPhotoFile(idx) {
+    setNewPhotoFiles((prev) => prev.filter((_, i) => i !== idx));
+    setNewPhotoPreviews((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  async function removeExistingPhoto(photo) {
     try {
-      const url = await uploadAvatar(session.user.id, file);
+      const { error: delError } = await supabase.from("profile_photos").delete().eq("id", photo.id);
+      if (delError) throw delError;
+      setExistingPhotos((prev) => prev.filter((p) => p.id !== photo.id));
+    } catch (e) {
+      console.error(e);
+      setError("Impossible de supprimer cette photo.");
+    }
+  }
+
+  async function handleSaveProfile(e) {
+    e.preventDefault();
+    if (!editForm.name || !editForm.age || !currentUser) { setError("Nom et âge sont requis."); return; }
+    setSavingProfile(true);
+    try {
+      const uploadedUrls = [];
+      for (let i = 0; i < newPhotoFiles.length; i++) {
+        const url = await uploadPhoto(session.user.id, newPhotoFiles[i], existingPhotos.length + i);
+        uploadedUrls.push(url);
+      }
+
+      let newPhotoRows = [];
+      if (uploadedUrls.length > 0) {
+        const startPos = existingPhotos.length;
+        const rows = uploadedUrls.map((url, idx) => ({
+          profile_id: currentUser.id, url, position: startPos + idx,
+        }));
+        const { data: inserted, error: photoError } = await supabase
+          .from("profile_photos")
+          .insert(rows)
+          .select();
+        if (photoError) throw photoError;
+        newPhotoRows = inserted || [];
+      }
+
+      const allPhotos = [...existingPhotos, ...newPhotoRows];
+      const newAvatarUrl = allPhotos[0]?.url || null;
+
+      const payload = {
+        name: editForm.name,
+        age: Number(editForm.age),
+        country: editForm.country,
+        languages: editForm.languages,
+        city: editForm.city,
+        arrived_since: editForm.arrivedSince,
+        looking_for: editForm.lookingFor,
+        bio: editForm.bio,
+        occupation: editForm.occupation,
+        interests: editForm.interests,
+        education_level: editForm.educationLevel,
+        has_children: editForm.hasChildren,
+        avatar_url: newAvatarUrl,
+      };
       const { data, error: updateError } = await supabase
         .from("profiles")
-        .update({ avatar_url: url })
+        .update(payload)
         .eq("id", currentUser.id)
         .select()
         .single();
       if (updateError) throw updateError;
+
       setCurrentUser(data);
       setProfiles((ps) => ps.map((p) => (p.id === data.id ? data : p)));
+      setProfilePhotos((pp) => ({ ...pp, [data.id]: allPhotos }));
+      setError("");
+      setView("discover");
     } catch (e) {
       console.error(e);
-      setError("Échec de l'envoi de la photo.");
+      setError("Erreur lors de la mise à jour du profil.");
     } finally {
-      setUploadingAvatar(false);
+      setSavingProfile(false);
     }
   }
 
@@ -253,9 +393,10 @@ export default function App() {
     if (!form.name || !form.age) { setError("Nom et âge sont requis."); return; }
     setSaving(true);
     try {
-      let avatarUrl = null;
-      if (avatarFile) {
-        avatarUrl = await uploadAvatar(session.user.id, avatarFile);
+      const uploadedUrls = [];
+      for (let i = 0; i < photoFiles.length; i++) {
+        const url = await uploadPhoto(session.user.id, photoFiles[i], i);
+        uploadedUrls.push(url);
       }
       const payload = {
         user_id: session.user.id,
@@ -267,7 +408,11 @@ export default function App() {
         arrived_since: form.arrivedSince,
         looking_for: form.lookingFor,
         bio: form.bio,
-        avatar_url: avatarUrl,
+        occupation: form.occupation,
+        interests: form.interests,
+        education_level: form.educationLevel,
+        has_children: form.hasChildren,
+        avatar_url: uploadedUrls[0] || null,
       };
       const { data, error: insertError } = await supabase
         .from("profiles")
@@ -275,10 +420,25 @@ export default function App() {
         .select()
         .single();
       if (insertError) throw insertError;
+
+      let photoRows = [];
+      if (uploadedUrls.length > 0) {
+        const rows = uploadedUrls.map((url, idx) => ({ profile_id: data.id, url, position: idx }));
+        const { data: inserted, error: photoError } = await supabase
+          .from("profile_photos")
+          .insert(rows)
+          .select();
+        if (photoError) throw photoError;
+        photoRows = inserted || [];
+      }
+
       setCurrentUser(data);
       setProfiles((p) => [...p, data]);
+      setProfilePhotos((pp) => ({ ...pp, [data.id]: photoRows }));
       setDiscoverIdx(0);
       setError("");
+      setPhotoFiles([]);
+      setPhotoPreviews([]);
       setView("discover");
     } catch (e) {
       console.error(e);
@@ -407,8 +567,8 @@ export default function App() {
             prototype
           </span>
         </div>
-        {currentUser && (
-          <label className="flex items-center gap-2 cursor-pointer">
+        {currentUser && view !== "editProfile" && (
+          <button onClick={openEditProfile} className="flex items-center gap-2">
             <div style={{ position: "relative" }}>
               <Avatar name={currentUser.name} url={currentUser.avatar_url} size={30} />
               {uploadingAvatar && (
@@ -418,8 +578,7 @@ export default function App() {
               )}
             </div>
             <span className="text-sm font-medium">{currentUser.name}</span>
-            <input type="file" accept="image/*" onChange={handleAvatarUpdate} className="hidden" />
-          </label>
+          </button>
         )}
       </div>
 
@@ -440,18 +599,28 @@ export default function App() {
               Créer ton profil
             </h2>
             <form onSubmit={handleCreateProfile} className="flex flex-col gap-3">
-              <label className="flex flex-col items-center gap-2 mb-2 cursor-pointer">
-                <div style={{ position: "relative" }}>
-                  {avatarPreview ? (
-                    <img src={avatarPreview} alt="Aperçu" style={{ width: 88, height: 88, borderRadius: "50%", objectFit: "cover" }} />
-                  ) : (
-                    <div style={{ width: 88, height: 88, borderRadius: "50%", background: "rgba(43,36,32,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <span className="text-xs text-center px-2" style={{ color: "rgba(43,36,32,0.5)" }}>Ajouter une photo</span>
+              <div className="mb-2">
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {photoPreviews.map((src, i) => (
+                    <div key={i} style={{ position: "relative" }}>
+                      <img src={src} alt={`Photo ${i + 1}`} style={{ width: 72, height: 72, borderRadius: 12, objectFit: "cover" }} />
+                      <button type="button" onClick={() => removePhotoFile(i)}
+                        style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: C.indigo, color: "#fff", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        ×
+                      </button>
                     </div>
+                  ))}
+                  {photoPreviews.length < MAX_PHOTOS && (
+                    <label className="cursor-pointer flex items-center justify-center" style={{ width: 72, height: 72, borderRadius: 12, border: "1px dashed rgba(43,36,32,0.3)" }}>
+                      <span className="text-xs text-center px-1" style={{ color: "rgba(43,36,32,0.5)" }}>+ Ajouter</span>
+                      <input type="file" accept="image/*" multiple onChange={handlePhotosSelected} className="hidden" />
+                    </label>
                   )}
                 </div>
-                <input type="file" accept="image/*" onChange={handleAvatarFileChange} className="hidden" />
-              </label>
+                <p className="text-xs" style={{ color: "rgba(43,36,32,0.5)" }}>
+                  Jusqu'à {MAX_PHOTOS} photos. La première sera ta photo principale.
+                </p>
+              </div>
               <input placeholder="Prénom" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
                 className="p-3 rounded-lg text-sm" style={{ border: "1px solid rgba(43,36,32,0.15)" }} />
               <input placeholder="Âge" type="number" value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })}
@@ -477,11 +646,158 @@ export default function App() {
                 ))}
               </div>
 
+              <input placeholder="Profession / métier" value={form.occupation} onChange={(e) => setForm({ ...form, occupation: e.target.value })}
+                className="p-3 rounded-lg text-sm" style={{ border: "1px solid rgba(43,36,32,0.15)" }} />
+              <input placeholder="Centres d'intérêt (ex : cuisine, danse, foot...)" value={form.interests} onChange={(e) => setForm({ ...form, interests: e.target.value })}
+                className="p-3 rounded-lg text-sm" style={{ border: "1px solid rgba(43,36,32,0.15)" }} />
+
+              <div>
+                <p className="text-xs mb-1.5" style={{ color: "rgba(43,36,32,0.55)" }}>Niveau d'études</p>
+                <div className="flex gap-2 flex-wrap">
+                  {EDUCATION_LEVELS.map((opt) => (
+                    <button type="button" key={opt} onClick={() => setForm({ ...form, educationLevel: opt })}
+                      className="text-xs font-semibold px-3 py-2 rounded-full"
+                      style={form.educationLevel === opt
+                        ? { background: C.ochre, color: C.indigoDeep }
+                        : { border: "1px solid rgba(43,36,32,0.2)", color: C.ink }}>
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs mb-1.5" style={{ color: "rgba(43,36,32,0.55)" }}>As-tu des enfants ?</p>
+                <div className="flex gap-2">
+                  {HAS_CHILDREN_OPTIONS.map((opt) => (
+                    <button type="button" key={opt} onClick={() => setForm({ ...form, hasChildren: opt })}
+                      className="text-xs font-semibold px-3 py-2 rounded-full"
+                      style={form.hasChildren === opt
+                        ? { background: C.ochre, color: C.indigoDeep }
+                        : { border: "1px solid rgba(43,36,32,0.2)", color: C.ink }}>
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <textarea placeholder="Une courte bio..." value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })}
                 rows={3} className="p-3 rounded-lg text-sm" style={{ border: "1px solid rgba(43,36,32,0.15)" }} />
 
               <button type="submit" disabled={saving} className="mt-2 py-3 rounded-full font-semibold text-sm disabled:opacity-60" style={{ background: C.indigo, color: C.sand }}>
                 {saving ? "Création..." : "Créer mon profil"}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* ---------- ÉDITION DE PROFIL ---------- */}
+        {view === "editProfile" && editForm && (
+          <div className="p-6 max-w-md mx-auto w-full">
+            <button onClick={() => setView("discover")} className="flex items-center gap-1 text-sm mb-4" style={{ color: C.indigo }}>
+              <ArrowLeft size={16} /> Retour
+            </button>
+            <h2 style={{ fontFamily: "serif", fontStyle: "italic", fontSize: 24, color: C.indigo }} className="mb-4">
+              Modifier mon profil
+            </h2>
+            <form onSubmit={handleSaveProfile} className="flex flex-col gap-3">
+              <div className="mb-2">
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {existingPhotos.map((photo) => (
+                    <div key={photo.id} style={{ position: "relative" }}>
+                      <img src={photo.url} alt="Photo" style={{ width: 72, height: 72, borderRadius: 12, objectFit: "cover" }} />
+                      <button type="button" onClick={() => removeExistingPhoto(photo)}
+                        style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: C.indigo, color: "#fff", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  {newPhotoPreviews.map((src, i) => (
+                    <div key={`new-${i}`} style={{ position: "relative" }}>
+                      <img src={src} alt={`Nouvelle photo ${i + 1}`} style={{ width: 72, height: 72, borderRadius: 12, objectFit: "cover" }} />
+                      <button type="button" onClick={() => removeNewPhotoFile(i)}
+                        style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: C.indigo, color: "#fff", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  {existingPhotos.length + newPhotoPreviews.length < MAX_PHOTOS && (
+                    <label className="cursor-pointer flex items-center justify-center" style={{ width: 72, height: 72, borderRadius: 12, border: "1px dashed rgba(43,36,32,0.3)" }}>
+                      <span className="text-xs text-center px-1" style={{ color: "rgba(43,36,32,0.5)" }}>+ Ajouter</span>
+                      <input type="file" accept="image/*" multiple onChange={handleNewPhotosSelected} className="hidden" />
+                    </label>
+                  )}
+                </div>
+                <p className="text-xs" style={{ color: "rgba(43,36,32,0.5)" }}>
+                  Jusqu'à {MAX_PHOTOS} photos. La première est ta photo principale.
+                </p>
+              </div>
+
+              <input placeholder="Prénom" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                className="p-3 rounded-lg text-sm" style={{ border: "1px solid rgba(43,36,32,0.15)" }} />
+              <input placeholder="Âge" type="number" value={editForm.age} onChange={(e) => setEditForm({ ...editForm, age: e.target.value })}
+                className="p-3 rounded-lg text-sm" style={{ border: "1px solid rgba(43,36,32,0.15)" }} />
+              <input placeholder="Pays d'origine" value={editForm.country} onChange={(e) => setEditForm({ ...editForm, country: e.target.value })}
+                className="p-3 rounded-lg text-sm" style={{ border: "1px solid rgba(43,36,32,0.15)" }} />
+              <input placeholder="Langues parlées" value={editForm.languages} onChange={(e) => setEditForm({ ...editForm, languages: e.target.value })}
+                className="p-3 rounded-lg text-sm" style={{ border: "1px solid rgba(43,36,32,0.15)" }} />
+              <input placeholder="Ville (Canada)" value={editForm.city} onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                className="p-3 rounded-lg text-sm" style={{ border: "1px solid rgba(43,36,32,0.15)" }} />
+              <input placeholder="Depuis quand au Canada ?" value={editForm.arrivedSince} onChange={(e) => setEditForm({ ...editForm, arrivedSince: e.target.value })}
+                className="p-3 rounded-lg text-sm" style={{ border: "1px solid rgba(43,36,32,0.15)" }} />
+
+              <div className="flex gap-2 flex-wrap">
+                {LOOKING_FOR.map((opt) => (
+                  <button type="button" key={opt} onClick={() => setEditForm({ ...editForm, lookingFor: opt })}
+                    className="text-xs font-semibold px-3 py-2 rounded-full"
+                    style={editForm.lookingFor === opt
+                      ? { background: C.ochre, color: C.indigoDeep }
+                      : { border: "1px solid rgba(43,36,32,0.2)", color: C.ink }}>
+                    {opt}
+                  </button>
+                ))}
+              </div>
+
+              <input placeholder="Profession / métier" value={editForm.occupation} onChange={(e) => setEditForm({ ...editForm, occupation: e.target.value })}
+                className="p-3 rounded-lg text-sm" style={{ border: "1px solid rgba(43,36,32,0.15)" }} />
+              <input placeholder="Centres d'intérêt" value={editForm.interests} onChange={(e) => setEditForm({ ...editForm, interests: e.target.value })}
+                className="p-3 rounded-lg text-sm" style={{ border: "1px solid rgba(43,36,32,0.15)" }} />
+
+              <div>
+                <p className="text-xs mb-1.5" style={{ color: "rgba(43,36,32,0.55)" }}>Niveau d'études</p>
+                <div className="flex gap-2 flex-wrap">
+                  {EDUCATION_LEVELS.map((opt) => (
+                    <button type="button" key={opt} onClick={() => setEditForm({ ...editForm, educationLevel: opt })}
+                      className="text-xs font-semibold px-3 py-2 rounded-full"
+                      style={editForm.educationLevel === opt
+                        ? { background: C.ochre, color: C.indigoDeep }
+                        : { border: "1px solid rgba(43,36,32,0.2)", color: C.ink }}>
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs mb-1.5" style={{ color: "rgba(43,36,32,0.55)" }}>As-tu des enfants ?</p>
+                <div className="flex gap-2">
+                  {HAS_CHILDREN_OPTIONS.map((opt) => (
+                    <button type="button" key={opt} onClick={() => setEditForm({ ...editForm, hasChildren: opt })}
+                      className="text-xs font-semibold px-3 py-2 rounded-full"
+                      style={editForm.hasChildren === opt
+                        ? { background: C.ochre, color: C.indigoDeep }
+                        : { border: "1px solid rgba(43,36,32,0.2)", color: C.ink }}>
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <textarea placeholder="Une courte bio..." value={editForm.bio} onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
+                rows={3} className="p-3 rounded-lg text-sm" style={{ border: "1px solid rgba(43,36,32,0.15)" }} />
+
+              <button type="submit" disabled={savingProfile} className="mt-2 py-3 rounded-full font-semibold text-sm disabled:opacity-60" style={{ background: C.indigo, color: C.sand }}>
+                {savingProfile ? "Enregistrement..." : "Enregistrer les modifications"}
               </button>
             </form>
           </div>
@@ -514,6 +830,9 @@ export default function App() {
             ) : (
               (() => {
                 const p = candidates[discoverIdx];
+                const photos = profilePhotos[p.id]?.length ? profilePhotos[p.id] : (p.avatar_url ? [{ url: p.avatar_url }] : []);
+                const photoIdx = cardPhotoIdx[p.id] || 0;
+                const currentPhoto = photos[photoIdx]?.url;
                 return (
                   <div className="w-full rounded-2xl overflow-hidden bg-white" style={{ border: "1px solid rgba(43,36,32,0.1)", position: "relative" }}>
                     <div style={{ position: "absolute", top: 12, right: 12, zIndex: 5 }}>
@@ -544,10 +863,24 @@ export default function App() {
                       )}
                     </div>
                     <div className="h-48 flex items-end p-4" style={{
-                      background: p.avatar_url
-                        ? `linear-gradient(rgba(20,29,56,0) 40%, rgba(20,29,56,0.75)), url(${p.avatar_url}) center/cover`
+                      position: "relative",
+                      background: currentPhoto
+                        ? `linear-gradient(rgba(20,29,56,0) 40%, rgba(20,29,56,0.75)), url(${currentPhoto}) center/cover`
                         : `linear-gradient(150deg, ${C.ochre}, ${C.clay} 55%, ${C.indigo} 130%)`
                     }}>
+                      {photos.length > 1 && (
+                        <>
+                          <button onClick={(ev) => prevCardPhoto(p.id, photos.length, ev)}
+                            style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "35%" }} aria-label="Photo précédente" />
+                          <button onClick={(ev) => nextCardPhoto(p.id, photos.length, ev)}
+                            style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: "35%" }} aria-label="Photo suivante" />
+                          <div style={{ position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 4 }}>
+                            {photos.map((_, i) => (
+                              <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: i === photoIdx ? "#fff" : "rgba(255,255,255,0.4)" }} />
+                            ))}
+                          </div>
+                        </>
+                      )}
                       <div style={{ fontFamily: "serif", fontStyle: "italic", fontSize: 26, color: "#fff" }}>{p.name}, {p.age}</div>
                     </div>
                     <div className="p-4">
@@ -556,7 +889,15 @@ export default function App() {
                         <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: C.sand }}>{p.languages}</span>
                         <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: C.sand }}>{p.city}</span>
                         <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: C.sand }}>Arrivé·e {p.arrived_since}</span>
+                        {p.occupation && <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: C.sand }}>{p.occupation}</span>}
+                        {p.education_level && <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: C.sand }}>{p.education_level}</span>}
+                        {p.has_children && <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: C.sand }}>{p.has_children === "Oui" ? "A des enfants" : "Sans enfant"}</span>}
                       </div>
+                      {p.interests && (
+                        <p className="text-xs mb-2" style={{ color: "rgba(43,36,32,0.55)" }}>
+                          <span style={{ fontWeight: 600 }}>Intérêts : </span>{p.interests}
+                        </p>
+                      )}
                       <p className="text-sm mb-4" style={{ color: "rgba(43,36,32,0.7)" }}>{p.bio || "—"}</p>
                       <div className="flex justify-center gap-4">
                         <button onClick={() => handlePass(p)} className="w-14 h-14 rounded-full flex items-center justify-center" style={{ border: "1px solid rgba(43,36,32,0.15)" }}>
@@ -709,7 +1050,7 @@ export default function App() {
       )}
 
       {/* Bottom nav */}
-      {currentUser && view !== "form" && (
+      {currentUser && view !== "form" && view !== "editProfile" && (
         <div className="flex justify-around py-3" style={{ borderTop: "1px solid rgba(43,36,32,0.1)", background: "#fff" }}>
           <button onClick={() => setView("discover")} className="flex flex-col items-center gap-0.5 text-xs" style={{ color: view === "discover" ? C.clay : "rgba(43,36,32,0.45)" }}>
             <Heart size={18} /> Découvrir
