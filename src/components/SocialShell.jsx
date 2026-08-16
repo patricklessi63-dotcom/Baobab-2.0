@@ -143,6 +143,8 @@ export default function SocialShell({
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4);
 
+  const newArrivals = candidates.filter((p) => p.arrived_since && p.arrived_since.trim());
+
   const filteredPosts = posts.filter((post) =>
     !search.trim() ||
     `${post.name} ${post.place} ${post.text}`.toLowerCase().includes(search.trim().toLowerCase())
@@ -479,7 +481,6 @@ export default function SocialShell({
         {tab === "feed" && (
           <FeedTab
             currentUser={currentUser}
-            firstName={firstName}
             stories={stories}
             viewedStories={viewedStories}
             openStory={openStory}
@@ -493,7 +494,9 @@ export default function SocialShell({
             openEditProfile={openEditProfile}
             candidates={candidates}
             handleLike={handleLike}
+            handlePass={handlePass}
             nearbyMembers={nearbyMembers}
+            newArrivals={newArrivals}
             communities={communities}
             matches={matches}
             openChat={openChat}

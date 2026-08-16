@@ -47,6 +47,14 @@ function proximityOf(userA, userB) {
   return { level: "unknown", points: 0, label: "Localisation approximative inconnue" };
 }
 
+// Simple fait, pas une estimation : nombre de centres d'intérêt textuels
+// identiques entre deux profils. Utilisé sur les cartes de l'accueil, sans
+// score ni "raisons" — ça reste pour la page Découvrir (computeCompatibility).
+export function countCommonInterests(userA, userB) {
+  if (!userA || !userB) return 0;
+  return sharedTags(parseTags(userA.interests), parseTags(userB.interests)).length;
+}
+
 export function computeCompatibility(currentUser, candidate) {
   if (!currentUser || !candidate) {
     return {
