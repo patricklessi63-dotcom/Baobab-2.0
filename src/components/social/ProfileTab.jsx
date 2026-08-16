@@ -1,0 +1,131 @@
+import React from "react";
+import { Send, CheckCheck, Image as ImageIcon } from "lucide-react";
+import Avatar from "../Avatar";
+import VerifiedBadge from "../VerifiedBadge";
+import { primary, green, coral, bg, muted } from "./theme";
+
+export default function ProfileTab({
+  currentUser,
+  posts,
+  openEditProfile,
+  matches,
+  candidates,
+  profileTab,
+  setProfileTab,
+  setComposer,
+  goTab,
+}) {
+          const isComplete = Boolean(currentUser?.bio && currentUser?.occupation && currentUser?.languages);
+          const myPosts = posts.filter((p) => p.name === currentUser?.name);
+          const aboutRows = [
+            ["Profession", currentUser?.occupation, "💼"],
+            ["Niveau d'études", currentUser?.education_level, "🎓"],
+            ["Langues parlées", currentUser?.languages, "🗣"],
+            ["Pays d'origine", currentUser?.country, "🌍"],
+            ["Ville au Canada", currentUser?.city, "📍"],
+            ["Au Canada depuis", currentUser?.arrived_since, "✈️"],
+            ["Recherche", currentUser?.looking_for, "♡"],
+            ["A des enfants", currentUser?.has_children, "👨‍👩‍👧"],
+            ["Centres d'intérêt", currentUser?.interests, "✨"],
+          ].filter(([, value]) => value);
+
+  return (
+          <section className="max-w-3xl mx-auto">
+            <div className="bg-white rounded-[32px] overflow-hidden border shadow-[0_18px_60px_rgba(21,27,61,.08)]">
+              <div className="h-40 md:h-52 relative" style={{ background: `linear-gradient(135deg,${primary},#2B3766 50%,${green})` }}>
+                <div className="absolute inset-0 opacity-20 text-[150px] leading-none flex items-center justify-center">🌍</div>
+                <div className="absolute right-4 top-4 flex gap-2">
+                  <button onClick={() => { navigator.share ? navigator.share({ title: "Baobab", text: `Découvre le profil de ${currentUser?.name} sur Baobab` }) : navigator.clipboard?.writeText(window.location.href); }} className="h-9 w-9 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center border border-white/15">
+                    <Send size={15} color="#fff" />
+                  </button>
+                  <button onClick={openEditProfile} className="rounded-xl bg-white/15 backdrop-blur text-white px-4 py-2.5 text-xs font-bold border border-white/15">Modifier le profil</button>
+                </div>
+                <div className="absolute -bottom-12 left-6"><div className="rounded-full p-1.5 bg-white"><Avatar name={currentUser?.name || "Toi"} url={currentUser?.avatar_url} size={92} /></div></div>
+              </div>
+              <div className="pt-16 p-6">
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-2xl font-black" style={{ color: primary }}>{currentUser?.name || "Ton profil"}</h1>
+                      <span className="h-3 w-3 rounded-full" style={{ background: "#27C56D" }} />
+                      <VerifiedBadge emailVerified={currentUser?.email_verified} phoneVerified={currentUser?.phone_verified} size={16} />
+                      {isComplete && (
+                        <span className="h-5 w-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#3897F0" }} title="Profil complet">
+                          <CheckCheck size={12} color="#fff" />
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm mt-1" style={{ color: muted }}>🟢 En ligne · {currentUser?.city || "Canada"} · {currentUser?.country || "Afrique"}</p>
+                  </div>
+                  <button onClick={() => goTab("discover")} className="px-4 py-2.5 rounded-xl font-bold text-sm" style={{ background: "#FFF3F1", color: coral }}>Trouver des personnes</button>
+                </div>
+                {currentUser?.bio && <p className="text-sm leading-6 mt-5 max-w-2xl">{currentUser.bio}</p>}
+                <div className="grid grid-cols-3 gap-3 mt-6">
+                  {[[matches.length, "Matchs"], [myPosts.length, "Publications"], [candidates.length, "Profils à découvrir"]].map(([value, label]) => <div key={label} className="rounded-2xl p-4 text-center" style={{ background: bg }}><b className="text-xl" style={{ color: primary }}>{value}</b><div className="text-[11px] mt-1" style={{ color: muted }}>{label}</div></div>)}
+                </div>
+              </div>
+
+              <div className="flex border-t" style={{ borderColor: "rgba(21,27,61,.08)" }}>
+                {[["posts", "Publications"], ["about", "À propos"]].map(([key, label]) => (
+                  <button key={key} onClick={() => setProfileTab(key)} className="flex-1 py-3.5 text-sm font-bold relative" style={{ color: profileTab === key ? primary : muted }}>
+                    {label}
+                    {profileTab === key && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 h-[3px] w-10 rounded-full" style={{ background: coral }} />}
+                  </button>
+                ))}
+              </div>
+
+              {profileTab === "posts" ? (
+                myPosts.length === 0 ? (
+                  <div className="p-10 text-center">
+                    <ImageIcon size={26} className="mx-auto mb-2" color={muted} />
+                    <p className="text-sm mb-3" style={{ color: muted }}>Pas encore de publication.</p>
+                    <button onClick={() => setComposer(true)} className="px-4 py-2.5 rounded-xl font-bold text-sm" style={{ background: primary, color: "#fff" }}>Créer ma première publication</button>
+                  </div>
+                ) : (
+                  <div className="p-3">
+                    <button onClick={() => setComposer(true)} className="w-full mb-3 py-2.5 rounded-xl font-bold text-sm" style={{ background: bg, color: primary }}>+ Nouvelle publication</button>
+                    <div className="grid grid-cols-3 gap-0.5">
+                      {myPosts.map((p) => (
+                        <div key={p.id} className="aspect-square relative overflow-hidden">
+                          {p.mediaUrl ? (
+                            p.mediaKind === "video" ? (
+                              <video src={p.mediaUrl} className="w-full h-full object-cover" />
+                            ) : (
+                              <img src={p.mediaUrl} alt="" className="w-full h-full object-cover" />
+                            )
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center p-3 text-center" style={{ background: `linear-gradient(150deg,${primary},${p.color})` }}>
+                              <span className="text-white text-[11px] font-semibold leading-4 line-clamp-4">{p.text}</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              ) : (
+                <div className="p-6">
+                  {aboutRows.length === 0 ? (
+                    <div className="text-center py-6">
+                      <p className="text-sm" style={{ color: muted }}>Complète ton profil pour donner plus de contexte aux autres membres.</p>
+                      <button onClick={openEditProfile} className="mt-3 px-4 py-2.5 rounded-xl font-bold text-sm" style={{ background: primary, color: "#fff" }}>Compléter mon profil</button>
+                    </div>
+                  ) : (
+                    <div className="grid md:grid-cols-2 gap-3">
+                      {aboutRows.map(([label, value, icon]) => (
+                        <div key={label} className="rounded-2xl p-4 flex items-start gap-3" style={{ background: bg }}>
+                          <span className="text-lg leading-none">{icon}</span>
+                          <div className="min-w-0">
+                            <div className="text-[10px] uppercase tracking-wider font-black" style={{ color: muted }}>{label}</div>
+                            <div className="text-sm font-bold mt-1 break-words">{value}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </section>
+  );
+}
