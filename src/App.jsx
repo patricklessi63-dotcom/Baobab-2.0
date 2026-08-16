@@ -109,9 +109,20 @@ export default function App() {
 
   // Présence en ligne : heartbeat léger. Si les colonnes presence/last_seen
   // n'existent pas encore en base, l'interface continue simplement à fonctionner.
+  // Respecte le paramètre de confidentialité "Statut en ligne visible" :
+  // si désactivé, on écrit is_online=false une fois puis on arrête d'émettre.
   useEffect(() => {
     if (!session?.user?.id) return;
     let alive = true;
+
+    if (currentUser && currentUser.show_online_status === false) {
+      setIsOnline(false);
+      supabase.from("profiles").update({
+        is_online: false,
+        last_seen: new Date().toISOString(),
+      }).eq("user_id", session.user.id).catch(() => {});
+      return;
+    }
 
     const heartbeat = async () => {
       const now = new Date().toISOString();
@@ -147,7 +158,7 @@ export default function App() {
       clearInterval(timer);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [session?.user?.id]);
+  }, [session?.user?.id, currentUser?.show_online_status]);
 
   // Une fois connecté, charger les données et retrouver (ou non) son propre profil
   useEffect(() => {
@@ -216,6 +227,36 @@ export default function App() {
     } catch (e) {
       console.error(e);
       setError("Impossible de bloquer ce profil.");
+    }
+  }
+
+  async function handleUnblock(target) {
+    if (!currentUser) return;
+    try {
+      const { error: unblockError } = await supabase
+        .from("blocks")
+        .delete()
+        .eq("from_id", currentUser.id)
+        .eq("to_id", target.id);
+      if (unblockError) throw unblockError;
+      setBlockPairs((b) => b.filter((pair) => !(pair.from_id === currentUser.id && pair.to_id === target.id)));
+    } catch (e) {
+      console.error(e);
+      setError("Impossible de débloquer ce profil.");
+    }
+  }
+
+  async function handleToggleOnlineStatus(checked) {
+    if (!currentUser) return;
+    setCurrentUser((u) => ({ ...u, show_online_status: checked }));
+    try {
+      const { error: toggleError } = await supabase
+        .from("profiles")
+        .update({ show_online_status: checked })
+        .eq("id", currentUser.id);
+      if (toggleError) throw toggleError;
+    } catch (e) {
+      console.error(e);
     }
   }
 
@@ -479,6 +520,10 @@ export default function App() {
           !hasBlocked(currentUser.id, p.id) &&
           !hasBlocked(p.id, currentUser.id)
       )
+    : [];
+
+  const blockedProfiles = currentUser
+    ? profiles.filter((p) => blockPairs.some((b) => b.from_id === currentUser.id && b.to_id === p.id))
     : [];
 
   async function handleLike(target) {
@@ -780,7 +825,10 @@ export default function App() {
         submitReport={submitReport}
         settingsOpen={settingsOpen}
         setSettingsOpen={setSettingsOpen}
-        setIsOnline={setIsOnline}
+        currentUser={currentUser}
+        onToggleOnlineStatus={handleToggleOnlineStatus}
+        blockedProfiles={blockedProfiles}
+        onUnblock={handleUnblock}
         privacyOpen={privacyOpen}
         setPrivacyOpen={setPrivacyOpen}
         termsOpen={termsOpen}

@@ -1,8 +1,10 @@
 import React from "react";
-import { ArrowLeft, MoreVertical, Flag, Ban, Send, CheckCheck, Circle } from "lucide-react";
+import { ArrowLeft, MoreVertical, Flag, Ban, Send, CheckCheck, Circle, ShieldAlert, ShieldCheck } from "lucide-react";
 import Avatar from "../components/Avatar";
+import VerifiedBadge from "../components/VerifiedBadge";
 import { C } from "../constants";
 import { formatLastSeen, formatMessageTime, formatDayLabel } from "../utils/format";
+import { detectMoneyRequest } from "../lib/moneyGuard";
 
 const iceBreakers = [
   "Le plat de chez toi qui te manque le plus ?",
@@ -40,7 +42,10 @@ export default function ChatScreen({
           />
         </div>
         <div>
-          <div className="text-sm font-semibold">{activeMatch.name}</div>
+          <div className="text-sm font-semibold flex items-center gap-1.5">
+            {activeMatch.name}
+            <VerifiedBadge emailVerified={activeMatch.email_verified} phoneVerified={activeMatch.phone_verified} size={13} />
+          </div>
           <div className="text-xs" style={{ color: otherTyping ? C.clay : "rgba(43,36,32,0.45)" }}>
             {otherTyping ? "en train d'écrire…" : activeMatch.is_online ? "En ligne" : formatLastSeen(activeMatch.last_seen)}
           </div>
@@ -78,6 +83,7 @@ export default function ChatScreen({
           const showDaySeparator = !prev || formatDayLabel(prev.created_at) !== formatDayLabel(m.created_at);
           const isMine = m.from_id === currentUser.id;
           const groupedWithPrev = prev && !showDaySeparator && prev.from_id === m.from_id;
+          const moneyCheck = !isMine ? detectMoneyRequest(m.text) : null;
           return (
             <React.Fragment key={m.id}>
               {showDaySeparator && (
@@ -102,6 +108,12 @@ export default function ChatScreen({
                   {isMine && <CheckCheck size={12} />}
                 </span>
               </div>
+              {moneyCheck?.flagged && (
+                <div className="max-w-[85%] text-xs px-3.5 py-2.5 rounded-2xl flex items-start gap-2" style={{ alignSelf: "flex-start", background: "#FFF3F1", color: C.clay, marginTop: 4 }}>
+                  <ShieldAlert size={15} className="flex-shrink-0 mt-0.5" />
+                  <span>Ce message pourrait être une demande d'argent. Ne partage jamais tes informations bancaires et ne fais jamais de virement à quelqu'un rencontré sur Baobab.</span>
+                </div>
+              )}
             </React.Fragment>
           );
         })}
@@ -109,6 +121,9 @@ export default function ChatScreen({
 
       {messages.length === 0 && (
         <div className="px-4 pb-2 flex flex-col gap-1.5">
+          <div className="flex items-center gap-1.5 text-[11px] mb-1" style={{ color: "rgba(43,36,32,0.5)" }}>
+            <ShieldCheck size={12} /> Baobab ne te demandera jamais d'argent. Ne partage jamais tes informations bancaires.
+          </div>
           {iceBreakers.map((ib) => (
             <button key={ib} onClick={() => setMessageDraft(ib)} className="bb-btn text-left text-xs px-3 py-2.5" style={{ background: "#fff", border: "1px solid var(--bb-border)", borderRadius: "var(--bb-radius-sm)", color: C.indigo }}>
               {ib}

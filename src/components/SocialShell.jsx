@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Home, Heart, X, MessageCircle, LogOut, Send, Sparkles, MoreVertical, Settings, Image as ImageIcon, CheckCheck, UserRound, Camera, Search, Bell, Calendar, Users } from "lucide-react";
 import Avatar from "./Avatar";
+import VerifiedBadge from "./VerifiedBadge";
 import { supabase } from "../supabaseClient";
 import { computeCompatibility } from "../lib/compatibility";
 
@@ -608,7 +609,10 @@ export default function SocialShell({
                             <Avatar name={m.name} url={m.avatar_url} size={40} />
                             <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white" style={{ background: m.is_online ? "#27C56D" : "#B9BEC9" }} />
                           </div>
-                          <div className="min-w-0 flex-1"><div className="text-sm font-bold truncate">{m.name}</div><div className="text-xs truncate" style={{ color: muted }}>{m.is_online ? "En ligne" : (m.city || "Canada")}</div></div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-bold truncate flex items-center gap-1.5">{m.name}<VerifiedBadge emailVerified={m.email_verified} phoneVerified={m.phone_verified} size={13} /></div>
+                            <div className="text-xs truncate" style={{ color: muted }}>{m.is_online ? "En ligne" : (m.city || "Canada")}</div>
+                          </div>
                           <MessageCircle size={16} color={coral} />
                         </button>
                       ))}
@@ -720,7 +724,10 @@ export default function SocialShell({
                         </div>
 
                         <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                          <div className="text-3xl font-black">{p.name}, {p.age}</div>
+                          <div className="text-3xl font-black flex items-center gap-2">
+                            {p.name}, {p.age}
+                            <VerifiedBadge emailVerified={p.email_verified} phoneVerified={p.phone_verified} size={20} color="#fff" />
+                          </div>
                           <div className="text-sm text-white/75 mt-1">📍 {p.city || "Canada"} · {p.occupation || "Nouveau membre"}</div>
                           {p.bio && <p className="text-sm text-white/80 mt-3 leading-6 max-w-lg">{p.bio}</p>}
                           <div className="flex flex-wrap gap-2 mt-4">
@@ -798,7 +805,7 @@ export default function SocialShell({
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-bold truncate">{m.name}</span>
+                        <span className="font-bold truncate flex items-center gap-1.5">{m.name}<VerifiedBadge emailVerified={m.email_verified} phoneVerified={m.phone_verified} size={13} /></span>
                         <span className="text-[11px] flex-shrink-0" style={{ color: m.is_online ? green : muted }}>{m.is_online ? "En ligne" : "Hors ligne"}</span>
                       </div>
                       <div className="text-xs mt-1 truncate" style={{ color: muted }}>{m.city || "Canada"} · Dites bonjour 👋</div>
@@ -867,6 +874,7 @@ export default function SocialShell({
                     <div className="flex items-center gap-2">
                       <h1 className="text-2xl font-black" style={{ color: primary }}>{currentUser?.name || "Ton profil"}</h1>
                       <span className="h-3 w-3 rounded-full" style={{ background: "#27C56D" }} />
+                      <VerifiedBadge emailVerified={currentUser?.email_verified} phoneVerified={currentUser?.phone_verified} size={16} />
                       {isComplete && (
                         <span className="h-5 w-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#3897F0" }} title="Profil complet">
                           <CheckCheck size={12} color="#fff" />
