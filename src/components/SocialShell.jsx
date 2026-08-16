@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Home, Heart, X, MessageCircle, LogOut, Send, Sparkles, MoreVertical, Settings, Image as ImageIcon, CheckCheck, UserRound, Camera, Search, Bell } from "lucide-react";
+import { Home, Heart, X, MessageCircle, LogOut, Send, Sparkles, MoreVertical, Settings, Image as ImageIcon, CheckCheck, UserRound, Camera, Search, Bell, Calendar, Users } from "lucide-react";
 import Avatar from "./Avatar";
 import { supabase } from "../supabaseClient";
+import { computeCompatibility } from "../lib/compatibility";
 
 const STORY_COLORS = ["#E56B5D", "#2F8F6B", "#5667A9", "#F2B84B", "#C1613D", "#1E2A4F"];
 function colorForProfile(id) {
@@ -28,15 +29,9 @@ export default function SocialShell({
   const [draft, setDraft] = useState("");
   const [composerMedia, setComposerMedia] = useState(null);
   const [composerMediaKind, setComposerMediaKind] = useState("");
-  const [posts, setPosts] = useState([
-    { id: 1, name: "Sarah Mbarga", initial: "S", place: "Montréal", time: "12 min", text: "Belle journée à Montréal ☀️ Qui connaît un bon endroit pour bruncher ce week-end ?", likes: 128, color: "#E56B5D" },
-    { id: 2, name: "David N.", initial: "D", place: "Québec", time: "38 min", text: "Petit souvenir de voyage. La vie est plus belle quand on découvre de nouvelles personnes 🌍", likes: 76, color: "#5667A9", media: true },
-    { id: 3, name: "Mireille K.", initial: "M", place: "Toronto", time: "1 h", text: "Nouveau départ, nouvelle énergie. Si tu viens d'arriver au Canada, bienvenue 🤎", likes: 54, color: "#2F8F6B" },
-  ]);
+  const [posts, setPosts] = useState([]);
   const [liked, setLiked] = useState({});
-  const [commentsByPost, setCommentsByPost] = useState({
-    1: [{ id: 1, name: "Brenda", text: "Je te recommande L'Avenue sur du Mont-Royal 👌" }],
-  });
+  const [commentsByPost, setCommentsByPost] = useState({});
   const [commenting, setCommenting] = useState(null);
   const [commentDraft, setCommentDraft] = useState("");
   const [menu, setMenu] = useState(false);
@@ -113,6 +108,38 @@ export default function SocialShell({
   const matches = getMatches();
 
   const firstName = currentUser?.name?.split(" ")[0] || "toi";
+
+  // ---------- Page d'accueil : données dérivées du profil réel, sans appel Supabase additionnel ----------
+  const growthStages = ["Graine", "Pousse", "Jeune baobab", "Baobab en croissance", "Baobab épanoui"];
+  const growthStageEmojis = ["🌱", "🌿", "🌳", "🌴", "🦒"];
+  const ownPhotoCount = profilePhotos[currentUser?.id]?.length || 0;
+  const profileCompletionChecks = [
+    Boolean(currentUser?.avatar_url || ownPhotoCount > 0),
+    Boolean(currentUser?.bio?.trim()),
+    Boolean(currentUser?.occupation?.trim()),
+    Boolean(currentUser?.interests?.trim()),
+    ownPhotoCount >= 3,
+    matches.length > 0,
+  ];
+  const completedSteps = profileCompletionChecks.filter(Boolean).length;
+  const totalSteps = profileCompletionChecks.length;
+  const growthPct = Math.round((completedSteps / totalSteps) * 100);
+  const growthStageIndex = Math.min(growthStages.length - 1, Math.floor((completedSteps / totalSteps) * growthStages.length));
+
+  const nearbyMembers = currentUser?.city
+    ? candidates.filter((p) => p.city && p.city.trim().toLowerCase() === currentUser.city.trim().toLowerCase())
+    : [];
+
+  const communities = Object.entries(
+    candidates.reduce((acc, p) => {
+      const city = (p.city || "").trim();
+      if (!city) return acc;
+      acc[city] = (acc[city] || 0) + 1;
+      return acc;
+    }, {})
+  )
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4);
 
   const filteredPosts = posts.filter((post) =>
     !search.trim() ||
@@ -439,163 +466,173 @@ export default function SocialShell({
 
       <main className="bb-content-in relative z-10 max-w-7xl mx-auto px-4 lg:px-8 pb-28 pt-6">
         {tab === "feed" && (
-          <div className="grid xl:grid-cols-[minmax(0,1fr)_330px] gap-7">
-            <section className="max-w-3xl">
-              <div className="mb-6">
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider" style={{ background: "#FFF1EC", color: coral }}><Sparkles size={13} /> Communauté africaine au Canada</div>
-                <h1 className="text-3xl md:text-4xl font-black tracking-tight mt-3" style={{ color: primary }}>Bonjour {firstName} 👋</h1>
-                <p className="mt-1 text-sm md:text-base" style={{ color: muted }}>Rencontre, échange et construis ton nouveau cercle au Canada.</p>
-              </div>
+          <div className="max-w-6xl mx-auto">
+            <div className="mb-7">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider" style={{ background: "#FFF1EC", color: coral }}><Sparkles size={13} /> Communauté africaine au Canada</div>
+              <h1 className="text-3xl md:text-4xl font-black tracking-tight mt-3" style={{ color: primary }}>Bonjour {firstName} 👋</h1>
+              <p className="mt-1 text-sm md:text-base" style={{ color: muted }}>Ton cercle canadien commence ici.</p>
+            </div>
 
-              <div className="flex gap-4 overflow-x-auto pb-1 mb-6 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
-                {stories.map((s, i) => {
-                  const seen = viewedStories[i];
-                  const ringBg = s.own
-                    ? "transparent"
-                    : seen
-                    ? "#D9DCE4"
-                    : `linear-gradient(135deg,${coral},${gold},${green})`;
-                  return (
-                    <button key={`${s.name}-${i}`} onClick={() => openStory(i)} className="shrink-0 flex flex-col items-center gap-1.5 w-[68px]">
-                      <div className="h-[64px] w-[64px] rounded-full flex items-center justify-center p-[3px]" style={{ background: ringBg }}>
-                        <div className="h-full w-full rounded-full p-[2px] bg-white flex items-center justify-center">
-                          {s.own ? (
-                            <div className="h-full w-full rounded-full flex items-center justify-center relative" style={{ background: bg }}>
-                              <Avatar name={currentUser?.name || "+"} url={currentUser?.avatar_url} size={56} />
-                              <span className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full flex items-center justify-center text-white text-sm font-black border-2 border-white" style={{ background: coral }}>+</span>
-                            </div>
-                          ) : (
-                            <div className="h-full w-full rounded-full flex items-center justify-center text-white font-black text-lg" style={{ background: `linear-gradient(160deg,${s.color},${primary})` }}>
-                              {s.initial}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <span className="text-[11px] font-semibold truncate w-full text-center" style={{ color: seen ? muted : "#20243A" }}>{s.own ? "Ton statut" : s.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className={`${card} p-4 md:p-5 mb-6`}>
-                <div className="flex items-center gap-3">
-                  <Avatar name={currentUser?.name || "Toi"} url={currentUser?.avatar_url} size={46} />
-                  <button onClick={() => setComposer(true)} className="flex-1 h-12 rounded-2xl px-4 text-left text-sm" style={{ background: bg, color: muted }}>Qu'est-ce que tu veux partager aujourd'hui, {firstName} ?</button>
-                </div>
-                <div className="grid grid-cols-3 gap-2 mt-3">
-                  <button onClick={() => { setComposer(true); setTimeout(() => pickMedia("photo"), 50); }} className={`${buttonBase} rounded-xl py-2.5 text-sm font-bold`} style={{ background: "#FFF3F1", color: coral }}><ImageIcon size={16} className="inline mr-1.5" />Photo</button>
-                  <button onClick={() => { setComposer(true); setTimeout(() => pickMedia("video"), 50); }} className={`${buttonBase} rounded-xl py-2.5 text-sm font-bold`} style={{ background: "#EEF8F4", color: green }}><Camera size={16} className="inline mr-1.5" />Vidéo</button>
-                  <button onClick={() => setComposer(true)} className={`${buttonBase} rounded-xl py-2.5 text-sm font-bold`} style={{ background: "#FFF8E8", color: "#A87414" }}>✍️ Texte</button>
-                </div>
-              </div>
-
-              {filteredPosts.length === 0 ? (
-                <div className={`${card} p-10 text-center`}><Search size={28} className="mx-auto mb-3" color={muted} /><b>Aucun partage trouvé</b><p className="text-sm mt-1" style={{ color: muted }}>Essaie un autre mot-clé.</p></div>
-              ) : filteredPosts.map((post, postIndex) => {
-                const postComments = commentsByPost[post.id] || [];
-                const isLiked = Boolean(liked[post.id]);
+            <div className="flex gap-4 overflow-x-auto pb-1 mb-7 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
+              {stories.map((s, i) => {
+                const seen = viewedStories[i];
+                const ringBg = s.own
+                  ? "transparent"
+                  : seen
+                  ? "#D9DCE4"
+                  : `linear-gradient(135deg,${coral},${gold},${green})`;
                 return (
-                  <React.Fragment key={post.id}>
-                  <article className={`${card} mb-5 overflow-hidden`}>
-                    <div className="p-4 flex items-center gap-3">
-                      <Avatar name={post.name} size={44} />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-bold text-sm">{post.name}</div>
-                        <div className="text-xs mt-0.5" style={{ color: muted }}>{post.place} · {post.time} · <span style={{ color: green }}>●</span> membre actif</div>
-                      </div>
-                      <button className="h-9 w-9 rounded-xl flex items-center justify-center hover:bg-slate-50"><MoreVertical size={18} color={muted} /></button>
-                    </div>
-                    <div className="px-4 pb-4 text-[15px] leading-6">{post.text}</div>
-                    {post.media && (
-                      post.mediaKind === "video" && post.mediaUrl ? (
-                        <video src={post.mediaUrl} controls className="w-full max-h-[460px] object-cover bg-black" />
-                      ) : post.mediaUrl ? (
-                        <img src={post.mediaUrl} alt="" className="w-full max-h-[460px] object-cover" />
-                      ) : (
-                        <div className="h-72 flex items-center justify-center text-white" style={{ background: `linear-gradient(135deg,${primary},${post.color})` }}>
-                          <div className="text-center"><div className="text-7xl">🌍</div><div className="font-bold">Souvenir de voyage</div></div>
-                        </div>
-                      )
-                    )}
-                    <div className="px-4 py-3 flex justify-between text-xs" style={{ color: muted }}>
-                      <span>{post.likes + (isLiked ? 1 : 0)} J'aime</span>
-                      <span>{postComments.length} commentaire{postComments.length > 1 ? "s" : ""}</span>
-                    </div>
-                    <div className="grid grid-cols-3 border-t" style={{ borderColor: "rgba(21,27,61,.07)" }}>
-                      <button onClick={() => setLiked((prev) => ({ ...prev, [post.id]: !prev[post.id] }))} className="py-3 text-sm font-bold" style={{ color: isLiked ? coral : muted }}><Heart size={17} className="inline mr-1.5" fill={isLiked ? coral : "none"} />J'aime</button>
-                      <button onClick={() => setCommenting(commenting === post.id ? null : post.id)} className="py-3 text-sm font-bold" style={{ color: muted }}><MessageCircle size={17} className="inline mr-1.5" />Commenter</button>
-                      <button onClick={() => sharePost(post)} className="py-3 text-sm font-bold" style={{ color: muted }}>↗ Partager</button>
-                    </div>
-                    {commenting === post.id && (
-                      <div className="border-t p-3" style={{ borderColor: "rgba(21,27,61,.07)" }}>
-                        {postComments.length > 0 && <div className="space-y-2 mb-3">{postComments.map((c) => <div key={c.id} className="flex gap-2 text-sm"><Avatar name={c.name} size={28} /><div className="rounded-2xl px-3 py-2" style={{ background: bg }}><b className="text-xs">{c.name}</b><div>{c.text}</div></div></div>)}</div>}
-                        <div className="flex gap-2">
-                          <input value={commentDraft} onChange={(e) => setCommentDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submitComment(post.id)} className="flex-1 rounded-xl px-3 py-2.5 text-sm outline-none" style={{ background: bg }} placeholder="Écrire un commentaire..." />
-                          <button onClick={() => submitComment(post.id)} className="w-10 rounded-xl text-white flex items-center justify-center" style={{ background: green }}><Send size={16} /></button>
-                        </div>
-                      </div>
-                    )}
-                  </article>
-                  {postIndex === 0 && candidates.length > 0 && (
-                    <div className={`${card} mb-5 p-5`}>
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <b className="text-sm">Suggestions pour toi</b>
-                          <div className="text-xs mt-0.5" style={{ color: muted }}>De nouveaux membres de la communauté</div>
-                        </div>
-                        <button onClick={() => goTab("discover")} className="text-xs font-bold" style={{ color: coral }}>Tout voir</button>
-                      </div>
-                      <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
-                        {candidates.slice(0, 6).map((p) => (
-                          <div key={p.id} className="shrink-0 w-36 rounded-2xl overflow-hidden border" style={{ borderColor: "rgba(21,27,61,.08)" }}>
-                            <div className="h-24 relative" style={{ background: p.avatar_url ? `url(${p.avatar_url}) center/cover` : `linear-gradient(150deg,${gold},${coral})` }}>
-                              {!p.avatar_url && <div className="absolute inset-0 flex items-center justify-center text-3xl">🌍</div>}
-                            </div>
-                            <div className="p-2.5">
-                              <div className="text-xs font-bold truncate">{p.name}, {p.age}</div>
-                              <div className="text-[10px] truncate mt-0.5" style={{ color: muted }}>{p.city || "Canada"}</div>
-                              <button onClick={() => handleLike(p)} className="w-full mt-2 rounded-lg py-1.5 text-[11px] font-bold" style={{ background: "#FFF3F1", color: coral }}>
-                                <Heart size={11} className="inline mr-1" />J'aime
-                              </button>
-                            </div>
+                  <button key={`${s.name}-${i}`} onClick={() => openStory(i)} className="shrink-0 flex flex-col items-center gap-1.5 w-[68px]">
+                    <div className="h-[64px] w-[64px] rounded-full flex items-center justify-center p-[3px]" style={{ background: ringBg }}>
+                      <div className="h-full w-full rounded-full p-[2px] bg-white flex items-center justify-center">
+                        {s.own ? (
+                          <div className="h-full w-full rounded-full flex items-center justify-center relative" style={{ background: bg }}>
+                            <Avatar name={currentUser?.name || "+"} url={currentUser?.avatar_url} size={56} />
+                            <span className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full flex items-center justify-center text-white text-sm font-black border-2 border-white" style={{ background: coral }}>+</span>
                           </div>
-                        ))}
+                        ) : (
+                          <div className="h-full w-full rounded-full flex items-center justify-center text-white font-black text-lg" style={{ background: `linear-gradient(160deg,${s.color},${primary})` }}>
+                            {s.initial}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )}
-                  </React.Fragment>
+                    <span className="text-[11px] font-semibold truncate w-full text-center" style={{ color: seen ? muted : "#20243A" }}>{s.own ? "Ton statut" : s.name}</span>
+                  </button>
                 );
               })}
-            </section>
+            </div>
 
-            <aside className="hidden xl:block space-y-5">
-              <div className="rounded-[30px] p-6 text-white shadow-[0_20px_60px_rgba(21,27,61,.18)] overflow-hidden relative" style={{ background: `linear-gradient(145deg,${primary},#2B3766)` }}>
-                <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10" />
-                <div className="text-[11px] uppercase tracking-[.22em] text-white/55">Nouveau départ</div>
-                <div className="text-2xl font-black mt-2">Ton cercle commence ici.</div>
-                <p className="text-sm text-white/70 mt-2 leading-6">Trouve des personnes qui comprennent le parcours d'installation au Canada.</p>
-                <button onClick={() => goTab("discover")} className="mt-5 rounded-xl px-4 py-3 font-bold" style={{ background: gold, color: primary }}>Découvrir des profils <span className="ml-1">→</span></button>
-              </div>
-
-              <div className={`${card} p-5`}>
-                <div className="flex items-center justify-between mb-4"><div><b className="text-sm">Nouveaux arrivants</b><div className="text-xs mt-0.5" style={{ color: muted }}>Des connexions proches de toi</div></div><span className="text-xs font-bold" style={{ color: coral }}>{candidates.length} profils</span></div>
-                <div className="space-y-3">
-                  {candidates.slice(0, 4).map((p) => (
-                    <button key={p.id} onClick={() => goTab("discover")} className="w-full flex items-center gap-3 text-left">
-                      <Avatar name={p.name} url={p.avatar_url} size={40} />
-                      <div className="min-w-0 flex-1"><div className="text-sm font-bold truncate">{p.name}, {p.age}</div><div className="text-xs truncate" style={{ color: muted }}>{p.city || "Canada"} · {p.country || "Afrique"}</div></div>
-                      <Heart size={16} color={coral} />
-                    </button>
-                  ))}
-                  {candidates.length === 0 && <p className="text-sm" style={{ color: muted }}>Crée ton profil et invite ta communauté à rejoindre Baobab.</p>}
+            {/* ---------- Ton Baobab : progression de l'arbre ---------- */}
+            <div className="rounded-[30px] p-6 md:p-7 text-white shadow-[0_20px_60px_rgba(21,27,61,.18)] overflow-hidden relative mb-7" style={{ background: `linear-gradient(145deg,${primary},#2B3766 60%,${green})` }}>
+              <div className="absolute -right-14 -top-14 h-44 w-44 rounded-full bg-white/10" />
+              <div className="absolute -right-4 -bottom-10 text-[130px] leading-none opacity-10 select-none">🌳</div>
+              <div className="relative flex flex-col md:flex-row md:items-center gap-5 md:gap-8">
+                <div className="flex-1 min-w-0">
+                  <div className="text-[11px] uppercase tracking-[.22em] text-white/55">Ton Baobab</div>
+                  <div className="text-2xl md:text-3xl font-black mt-2">{growthStages[growthStageIndex]} <span>{growthStageEmojis[growthStageIndex]}</span></div>
+                  <p className="text-sm text-white/70 mt-2 leading-6 max-w-md">Ton arbre grandit à mesure que tu complètes ton profil et te connectes à ta communauté.</p>
+                  <div className="mt-4 h-2.5 rounded-full bg-white/15 overflow-hidden max-w-sm">
+                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${growthPct}%`, background: `linear-gradient(90deg,${gold},${green})` }} />
+                  </div>
+                  <div className="text-xs mt-2 text-white/60">{completedSteps}/{totalSteps} étapes complétées</div>
                 </div>
+                {growthPct < 100 && (
+                  <button onClick={openEditProfile} className={`${buttonBase} shrink-0 rounded-xl px-5 py-3 font-bold`} style={{ background: gold, color: primary }}>Compléter mon profil <span className="ml-1">→</span></button>
+                )}
               </div>
+            </div>
 
-              <div className={`${card} p-5`}>
-                <div className="text-sm font-black mb-2">Bien s'intégrer au Canada 🇨🇦</div>
-                <p className="text-xs leading-5" style={{ color: muted }}>Partage tes bonnes adresses, tes conseils d'installation et les petites victoires de ton quotidien.</p>
-              </div>
-            </aside>
+            <div className="grid xl:grid-cols-[minmax(0,1fr)_330px] gap-7">
+              <section className="min-w-0">
+                <div className="mb-5">
+                  <h2 className="text-xl font-black" style={{ color: primary }}>Pour toi</h2>
+                  <p className="text-sm mt-1" style={{ color: muted }}>Des membres choisis pour toi, sur mesure.</p>
+                </div>
+
+                <div className={`${card} p-5 mb-5`}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div><b className="text-sm">Recommandations</b><div className="text-xs mt-0.5" style={{ color: muted }}>De nouveaux membres de la communauté</div></div>
+                    <button onClick={() => goTab("discover")} className="text-xs font-bold" style={{ color: coral }}>Tout voir</button>
+                  </div>
+                  {candidates.length === 0 ? (
+                    <p className="text-sm" style={{ color: muted }}>Pas encore de recommandation. Reviens bientôt, de nouveaux membres arrivent régulièrement.</p>
+                  ) : (
+                    <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
+                      {candidates.slice(0, 8).map((p) => (
+                        <div key={p.id} className="shrink-0 w-36 rounded-2xl overflow-hidden border" style={{ borderColor: "rgba(21,27,61,.08)" }}>
+                          <div className="h-24 relative" style={{ background: p.avatar_url ? `url(${p.avatar_url}) center/cover` : `linear-gradient(150deg,${gold},${coral})` }}>
+                            {!p.avatar_url && <div className="absolute inset-0 flex items-center justify-center text-3xl">🌍</div>}
+                          </div>
+                          <div className="p-2.5">
+                            <div className="text-xs font-bold truncate">{p.name}, {p.age}</div>
+                            <div className="text-[10px] truncate mt-0.5" style={{ color: muted }}>{p.city || "Canada"}</div>
+                            <button onClick={() => handleLike(p)} className="w-full mt-2 rounded-lg py-1.5 text-[11px] font-bold" style={{ background: "#FFF3F1", color: coral }}>
+                              <Heart size={11} className="inline mr-1" />J'aime
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className={`${card} p-5`}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <b className="text-sm">Autour de toi</b>
+                      <div className="text-xs mt-0.5" style={{ color: muted }}>{currentUser?.city ? `Membres à ${currentUser.city}` : "Renseigne ta ville pour voir qui est près de toi"}</div>
+                    </div>
+                  </div>
+                  {!currentUser?.city ? (
+                    <button onClick={openEditProfile} className="text-sm font-bold" style={{ color: coral }}>Ajouter ma ville →</button>
+                  ) : nearbyMembers.length === 0 ? (
+                    <p className="text-sm" style={{ color: muted }}>Personne d'autre à {currentUser.city} pour l'instant. Invite ta communauté à rejoindre Baobab.</p>
+                  ) : (
+                    <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
+                      {nearbyMembers.slice(0, 8).map((p) => (
+                        <div key={p.id} className="shrink-0 w-36 rounded-2xl overflow-hidden border" style={{ borderColor: "rgba(21,27,61,.08)" }}>
+                          <div className="h-24 relative" style={{ background: p.avatar_url ? `url(${p.avatar_url}) center/cover` : `linear-gradient(150deg,${green},${primary})` }}>
+                            {!p.avatar_url && <div className="absolute inset-0 flex items-center justify-center text-3xl">🌍</div>}
+                          </div>
+                          <div className="p-2.5">
+                            <div className="text-xs font-bold truncate">{p.name}, {p.age}</div>
+                            <div className="text-[10px] truncate mt-0.5" style={{ color: muted }}>{p.city}</div>
+                            <button onClick={() => handleLike(p)} className="w-full mt-2 rounded-lg py-1.5 text-[11px] font-bold" style={{ background: "#EEF8F4", color: green }}>
+                              <Heart size={11} className="inline mr-1" />J'aime
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className={`${card} p-6 mt-5 text-center`}>
+                  <Calendar size={26} className="mx-auto mb-2" color={muted} />
+                  <b className="text-sm">Événements</b>
+                  <p className="text-xs mt-1 max-w-xs mx-auto" style={{ color: muted }}>Les rencontres et événements communautaires arrivent bientôt sur Baobab.</p>
+                </div>
+              </section>
+
+              <aside className="space-y-5">
+                <div className={`${card} p-5`}>
+                  <div className="flex items-center justify-between mb-4"><b className="text-sm">Conversations</b><button onClick={() => goTab("matches")} className="text-xs font-bold" style={{ color: coral }}>Tout voir</button></div>
+                  {matches.length === 0 ? (
+                    <p className="text-sm" style={{ color: muted }}>Tes conversations apparaîtront ici dès que tu auras un match.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {matches.slice(0, 5).map((m) => (
+                        <button key={m.id} onClick={() => openChat(m)} className="w-full flex items-center gap-3 text-left">
+                          <div style={{ position: "relative" }}>
+                            <Avatar name={m.name} url={m.avatar_url} size={40} />
+                            <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white" style={{ background: m.is_online ? "#27C56D" : "#B9BEC9" }} />
+                          </div>
+                          <div className="min-w-0 flex-1"><div className="text-sm font-bold truncate">{m.name}</div><div className="text-xs truncate" style={{ color: muted }}>{m.is_online ? "En ligne" : (m.city || "Canada")}</div></div>
+                          <MessageCircle size={16} color={coral} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className={`${card} p-5`}>
+                  <div className="flex items-center justify-between mb-4"><b className="text-sm">Communautés</b></div>
+                  {communities.length === 0 ? (
+                    <p className="text-sm" style={{ color: muted }}>Les communautés par ville apparaîtront ici à mesure que Baobab grandit.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {communities.map(([city, count]) => (
+                        <button key={city} onClick={() => { setSearch(city); goTab("discover"); }} className="w-full flex items-center gap-3 text-left">
+                          <div className="h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: bg }}><Users size={17} color={primary} /></div>
+                          <div className="min-w-0 flex-1"><div className="text-sm font-bold truncate">{city}</div><div className="text-xs" style={{ color: muted }}>{count} membre{count > 1 ? "s" : ""}</div></div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </aside>
+            </div>
           </div>
         )}
 
@@ -695,6 +732,38 @@ export default function SocialShell({
                       </div>
                       <div className="p-5 md:p-6">
                         {p.interests && <div className="mb-4"><div className="text-[11px] font-black uppercase tracking-wider" style={{ color: muted }}>Centres d'intérêt</div><div className="text-sm mt-1">{p.interests}</div></div>}
+
+                        {(() => {
+                          const compat = computeCompatibility(currentUser, p);
+                          const compatColor = compat.level === "high" ? green : compat.level === "medium" ? gold : muted;
+                          return (
+                            <div className="mb-4 rounded-2xl p-4" style={{ background: bg }}>
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-[11px] font-black uppercase tracking-wider" style={{ color: primary }}>🌱 Baobab Match</span>
+                                <span className="text-lg font-black" style={{ color: compatColor }}>~{compat.score}%</span>
+                              </div>
+                              <div className="h-2 rounded-full bg-white overflow-hidden mb-3">
+                                <div className="h-full rounded-full" style={{ width: `${compat.score}%`, background: `linear-gradient(90deg,${gold},${green})` }} />
+                              </div>
+                              <ul className="space-y-1">
+                                {compat.reasons.map((r, i) => (
+                                  <li key={i} className="text-xs flex items-start gap-1.5" style={{ color: "#20243A" }}>
+                                    <span style={{ color: green }}>✓</span>{r}
+                                  </li>
+                                ))}
+                              </ul>
+                              {compat.commonInterests.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 mt-3">
+                                  {compat.commonInterests.map((t) => (
+                                    <span key={t} className="px-2 py-0.5 rounded-full text-[10px] font-semibold capitalize" style={{ background: "#FFF3F1", color: coral }}>{t}</span>
+                                  ))}
+                                </div>
+                              )}
+                              <p className="text-[10px] mt-3 leading-4" style={{ color: muted }}>{compat.disclaimer}</p>
+                            </div>
+                          );
+                        })()}
+
                         <div className="flex items-center justify-center gap-5">
                           <button onPointerDown={(e) => e.stopPropagation()} onClick={() => decideSwipe("pass")} className={`${buttonBase} h-16 w-16 rounded-full border-2 flex items-center justify-center bg-white`} style={{ borderColor: "#E5E7EF" }}><X size={28} color={muted} /></button>
                           <button onPointerDown={(e) => e.stopPropagation()} onClick={() => decideSwipe("like")} className={`${buttonBase} h-[72px] w-[72px] rounded-full text-white flex items-center justify-center shadow-xl`} style={{ background: `linear-gradient(135deg,${coral},#D94F70)` }}><Heart size={30} fill="white" /></button>
