@@ -75,7 +75,7 @@ export default function SocialShell({
         const ownIdx = latestPerProfile.findIndex((s) => s.profile_id === currentUser.id);
         const ownRow = ownIdx >= 0 ? latestPerProfile.splice(ownIdx, 1)[0] : null;
         const toEntry = (row, isOwn) => {
-          const name = isOwn ? "Votre statut" : (row.profile?.name || "?");
+          const name = isOwn ? (currentUser.name || "Toi") : (row.profile?.name || "?");
           const profileId = isOwn ? currentUser.id : row.profile_id;
           return {
             id: row?.id,
@@ -282,7 +282,7 @@ export default function SocialShell({
     try {
       let mediaUrl = null;
       const mediaKind = storyMedia ? storyMediaKind : null;
-      if (storyMedia) mediaUrl = await uploadStoryMedia(currentUser.id, storyMedia);
+      if (storyMedia) mediaUrl = await uploadStoryMedia(currentUser.user_id, storyMedia);
       const { data, error } = await supabase
         .from("stories")
         .insert({ profile_id: currentUser.id, text: text || null, media_url: mediaUrl, media_kind: mediaKind })
@@ -294,7 +294,7 @@ export default function SocialShell({
           id: data.id,
           profile_id: currentUser.id,
           own: true,
-          name: "Votre statut",
+          name: currentUser.name || "Toi",
           initial: (currentUser.name || "?").trim().charAt(0).toUpperCase(),
           color: colorForProfile(currentUser.id),
           text,
@@ -318,7 +318,7 @@ export default function SocialShell({
 
   const openStory = (index) => {
     const s = stories[index];
-    if (s?.own) { setStoryComposer(true); return; }
+    if (s?.own && !s.text && !s.media_url) { setStoryComposer(true); return; }
     setStoryViewerIndex(index);
     setViewedStories((prev) => ({ ...prev, [index]: true }));
     setStoryReply("");
@@ -353,6 +353,21 @@ export default function SocialShell({
     if (!storyReply.trim()) return;
     setStoryReply("");
     nextStory();
+  };
+
+  const deleteOwnStory = async () => {
+    const s = stories[storyViewerIndex];
+    if (!s?.own || !s?.id) { closeStoryViewer(); return; }
+    try {
+      const { error } = await supabase.from("stories").delete().eq("id", s.id);
+      if (error) throw error;
+      setStories((prev) => prev.map((st) =>
+        st.own ? { ...st, id: undefined, text: "", media_url: null, media_kind: null } : st
+      ));
+    } catch (e) {
+      console.error(e);
+    }
+    closeStoryViewer();
   };
 
   // Auto-avance chaque story après 5 secondes, comme sur Instagram
@@ -483,23 +498,34 @@ export default function SocialShell({
                   ? "#D9DCE4"
                   : `linear-gradient(135deg,${coral},${gold},${green})`;
                 return (
-                  <button key={`${s.name}-${i}`} onClick={() => openStory(i)} className="shrink-0 flex flex-col items-center gap-1.5 w-[68px]">
-                    <div className="h-[64px] w-[64px] rounded-full flex items-center justify-center p-[3px]" style={{ background: ringBg }}>
-                      <div className="h-full w-full rounded-full p-[2px] bg-white flex items-center justify-center">
-                        {s.own ? (
-                          <div className="h-full w-full rounded-full flex items-center justify-center relative" style={{ background: bg }}>
-                            <Avatar name={currentUser?.name || "+"} url={currentUser?.avatar_url} size={56} />
-                            <span className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full flex items-center justify-center text-white text-sm font-black border-2 border-white" style={{ background: coral }}>+</span>
-                          </div>
-                        ) : (
+                  <div key={`${s.name}-${i}`} className="shrink-0 flex flex-col items-center gap-1.5 w-[68px]">
+                    <div className="h-[64px] w-[64px] rounded-full flex items-center justify-center p-[3px] relative" style={{ background: ringBg }}>
+                      {s.own ? (
+                        <>
+                          <button onClick={() => openStory(i)} className="h-full w-full rounded-full p-[2px] bg-white flex items-center justify-center">
+                            <div className="h-full w-full rounded-full flex items-center justify-center relative" style={{ background: bg }}>
+                              <Avatar name={currentUser?.name || "+"} url={currentUser?.avatar_url} size={56} />
+                            </div>
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setStoryComposer(true); }}
+                            aria-label="Ajouter un statut"
+                            className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full flex items-center justify-center text-white text-sm font-black border-2 border-white"
+                            style={{ background: coral }}
+                          >
+                            +
+                          </button>
+                        </>
+                      ) : (
+                        <button onClick={() => openStory(i)} className="h-full w-full rounded-full p-[2px] bg-white flex items-center justify-center">
                           <div className="h-full w-full rounded-full flex items-center justify-center text-white font-black text-lg" style={{ background: `linear-gradient(160deg,${s.color},${primary})` }}>
                             {s.initial}
                           </div>
-                        )}
-                      </div>
+                        </button>
+                      )}
                     </div>
                     <span className="text-[11px] font-semibold truncate w-full text-center" style={{ color: seen ? muted : "#20243A" }}>{s.own ? "Ton statut" : s.name}</span>
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -1046,16 +1072,24 @@ export default function SocialShell({
             </div>
 
             <div className="absolute bottom-0 left-0 right-0 p-4 flex gap-2 z-10" style={{ background: "linear-gradient(180deg,transparent,rgba(0,0,0,.35))" }}>
-              <input
-                value={storyReply}
-                onChange={(e) => setStoryReply(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && sendStoryReply()}
-                placeholder={`Répondre à ${stories[storyViewerIndex].name}...`}
-                className="flex-1 rounded-full px-4 py-2.5 text-sm text-white bg-white/15 backdrop-blur border border-white/25 outline-none placeholder-white/60"
-              />
-              <button onClick={sendStoryReply} className="h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#fff" }}>
-                <Send size={16} color={primary} />
-              </button>
+              {stories[storyViewerIndex].own ? (
+                <button onClick={deleteOwnStory} className="flex-1 rounded-full px-4 py-2.5 text-sm font-bold text-white" style={{ background: "rgba(229,107,93,.85)" }}>
+                  Supprimer le statut
+                </button>
+              ) : (
+                <>
+                  <input
+                    value={storyReply}
+                    onChange={(e) => setStoryReply(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && sendStoryReply()}
+                    placeholder={`Répondre à ${stories[storyViewerIndex].name}...`}
+                    className="flex-1 rounded-full px-4 py-2.5 text-sm text-white bg-white/15 backdrop-blur border border-white/25 outline-none placeholder-white/60"
+                  />
+                  <button onClick={sendStoryReply} className="h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#fff" }}>
+                    <Send size={16} color={primary} />
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
