@@ -448,17 +448,14 @@ export default function SocialShell({
           <div className="flex items-center gap-2 shrink-0 relative">
             <button onClick={() => { setNotificationsOpen((v) => !v); setMenu(false); }} className={`${buttonBase} h-11 w-11 rounded-2xl hidden sm:flex items-center justify-center relative`} style={{ background: bg }}>
               <Bell size={19} color={primary} />
-              <span className="absolute top-2 right-2 h-2 w-2 rounded-full" style={{ background: coral }} />
             </button>
             {notificationsOpen && (
               <div className="absolute right-12 top-14 w-80 bg-white rounded-2xl border shadow-2xl p-3 z-50">
-                <div className="flex items-center justify-between px-2 pb-2"><b>Notifications</b><span className="text-xs" style={{ color: muted }}>2 nouvelles</span></div>
-                {[["Sarah a aimé ton profil", "Il y a 8 min", Heart], ["Brenda a publié un nouveau statut", "Il y a 25 min", Camera]].map(([title,time,Icon], i) => (
-                  <button key={i} onClick={() => setNotificationsOpen(false)} className="w-full flex gap-3 p-3 rounded-xl hover:bg-slate-50 text-left">
-                    <div className="h-9 w-9 rounded-xl flex items-center justify-center" style={{ background: i ? "#EEF8F4" : "#FFF3F1" }}><Icon size={16} color={i ? green : coral} /></div>
-                    <div><div className="text-sm font-semibold">{title}</div><div className="text-[11px]" style={{ color: muted }}>{time}</div></div>
-                  </button>
-                ))}
+                <div className="flex items-center justify-between px-2 pb-2"><b>Notifications</b></div>
+                <div className="p-6 text-center">
+                  <Bell size={22} className="mx-auto mb-2" color={muted} />
+                  <p className="text-xs" style={{ color: muted }}>Aucune notification pour l'instant.</p>
+                </div>
               </div>
             )}
             <button onClick={() => { setMenu((v) => !v); setNotificationsOpen(false); }} className={`${buttonBase} h-11 w-11 rounded-2xl flex items-center justify-center text-white font-black`} style={{ background: primary }}>
@@ -930,25 +927,29 @@ export default function SocialShell({
                 myPosts.length === 0 ? (
                   <div className="p-10 text-center">
                     <ImageIcon size={26} className="mx-auto mb-2" color={muted} />
-                    <p className="text-sm" style={{ color: muted }}>Pas encore de publication. Partage ton premier moment depuis le fil d'actualité.</p>
+                    <p className="text-sm mb-3" style={{ color: muted }}>Pas encore de publication.</p>
+                    <button onClick={() => setComposer(true)} className="px-4 py-2.5 rounded-xl font-bold text-sm" style={{ background: primary, color: "#fff" }}>Créer ma première publication</button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-3 gap-0.5 p-0.5">
-                    {myPosts.map((p) => (
-                      <div key={p.id} className="aspect-square relative overflow-hidden">
-                        {p.mediaUrl ? (
-                          p.mediaKind === "video" ? (
-                            <video src={p.mediaUrl} className="w-full h-full object-cover" />
+                  <div className="p-3">
+                    <button onClick={() => setComposer(true)} className="w-full mb-3 py-2.5 rounded-xl font-bold text-sm" style={{ background: bg, color: primary }}>+ Nouvelle publication</button>
+                    <div className="grid grid-cols-3 gap-0.5">
+                      {myPosts.map((p) => (
+                        <div key={p.id} className="aspect-square relative overflow-hidden">
+                          {p.mediaUrl ? (
+                            p.mediaKind === "video" ? (
+                              <video src={p.mediaUrl} className="w-full h-full object-cover" />
+                            ) : (
+                              <img src={p.mediaUrl} alt="" className="w-full h-full object-cover" />
+                            )
                           ) : (
-                            <img src={p.mediaUrl} alt="" className="w-full h-full object-cover" />
-                          )
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center p-3 text-center" style={{ background: `linear-gradient(150deg,${primary},${p.color})` }}>
-                            <span className="text-white text-[11px] font-semibold leading-4 line-clamp-4">{p.text}</span>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                            <div className="w-full h-full flex items-center justify-center p-3 text-center" style={{ background: `linear-gradient(150deg,${primary},${p.color})` }}>
+                              <span className="text-white text-[11px] font-semibold leading-4 line-clamp-4">{p.text}</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )
               ) : (
