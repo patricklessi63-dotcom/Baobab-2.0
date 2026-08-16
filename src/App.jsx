@@ -133,10 +133,11 @@ export default function App() {
       setIsOnline(true);
       setLastSeen(now);
       try {
-        await supabase.from("profiles").update({
+        const { error: heartbeatError } = await supabase.from("profiles").update({
           is_online: true,
           last_seen: now
         }).eq("user_id", session.user.id);
+        if (heartbeatError) console.error("heartbeat error:", heartbeatError.message, "| code:", heartbeatError.code, "| details:", heartbeatError.details, "| hint:", heartbeatError.hint);
       } catch (_) {}
     };
 
@@ -446,7 +447,7 @@ export default function App() {
       setError("");
       setView("feed");
     } catch (e) {
-      console.error(e);
+      console.error("handleSaveProfile error:", e?.message, "| code:", e?.code, "| details:", e?.details, "| hint:", e?.hint);
       setError("Erreur lors de la mise à jour du profil.");
     } finally {
       setSavingProfile(false);
