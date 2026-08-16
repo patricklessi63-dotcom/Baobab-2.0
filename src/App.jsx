@@ -11,6 +11,7 @@ import AppModals from "./components/AppModals";
 import CreateProfileForm from "./screens/CreateProfileForm";
 import EditProfileForm from "./screens/EditProfileForm";
 import ChatScreen from "./screens/ChatScreen";
+import UpdatePasswordScreen from "./screens/UpdatePasswordScreen";
 
 export default function App() {
   const [session, setSession] = useState(undefined); // undefined = pas encore vérifié, null = pas connecté
@@ -101,8 +102,11 @@ export default function App() {
   // Suivre l'état de connexion
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
+      // Lien "mot de passe oublié" cliqué depuis l'email : Supabase authentifie
+      // la session de récupération et émet cet événement.
+      if (event === "PASSWORD_RECOVERY") setView("update-password");
     });
     return () => listener.subscription.unsubscribe();
   }, []);
@@ -670,6 +674,10 @@ export default function App() {
 
   if (view === "auth") {
     return <Auth />;
+  }
+
+  if (view === "update-password") {
+    return <UpdatePasswordScreen onDone={() => setView("checking-profile")} />;
   }
 
   if (currentUser && ["feed", "stories", "profile", "discover", "matches"].includes(view)) {
