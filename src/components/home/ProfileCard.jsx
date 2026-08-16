@@ -63,7 +63,7 @@ export default function ProfileCard({
               <button
                 onClick={() => onPass(profile)}
                 aria-label={`Passer le profil de ${profile.name}`}
-                className="flex-1 rounded-lg py-2 flex items-center justify-center transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+                className="flex-1 rounded-lg py-2.5 flex items-center justify-center transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
                 style={{ background: "#F5F6FA", color: muted }}
               >
                 <X size={14} aria-hidden="true" />
@@ -73,7 +73,7 @@ export default function ProfileCard({
               <button
                 onClick={() => onLike(profile)}
                 aria-label={`Aimer le profil de ${profile.name}`}
-                className="flex-1 rounded-lg py-2 text-[11px] font-bold flex items-center justify-center gap-1 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+                className="flex-1 rounded-lg py-2.5 text-[11px] font-bold flex items-center justify-center gap-1 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
                 style={{ background: "#FFF3F1", color: coral }}
               >
                 <Heart size={12} aria-hidden="true" /> J'aime
@@ -83,7 +83,7 @@ export default function ProfileCard({
               <button
                 onClick={() => onMessage(profile)}
                 aria-label={`Envoyer un message à ${profile.name}`}
-                className="flex-1 rounded-lg py-2 flex items-center justify-center transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
+                className="flex-1 rounded-lg py-2.5 flex items-center justify-center transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1"
                 style={{ background: "#EEF8F4", color: green }}
               >
                 <MessageCircle size={14} aria-hidden="true" />

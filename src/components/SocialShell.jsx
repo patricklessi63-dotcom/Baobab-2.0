@@ -446,7 +446,7 @@ export default function SocialShell({
           </div>
 
           <div className="flex items-center gap-2 shrink-0 relative">
-            <button onClick={() => { setNotificationsOpen((v) => !v); setMenu(false); }} className={`${buttonBase} h-11 w-11 rounded-2xl hidden sm:flex items-center justify-center relative`} style={{ background: bg }}>
+            <button onClick={() => { setNotificationsOpen((v) => !v); setMenu(false); }} aria-label="Notifications" className={`${buttonBase} h-11 w-11 rounded-2xl hidden sm:flex items-center justify-center relative focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1`} style={{ background: bg }}>
               <Bell size={19} color={primary} />
             </button>
             {notificationsOpen && (
