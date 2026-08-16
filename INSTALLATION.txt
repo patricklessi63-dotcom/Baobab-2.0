@@ -1,0 +1,10 @@
+BAOBAB — AUTH INTÉGRATION
+
+Copie :
+1. src/Auth.jsx -> ton projet/src/Auth.jsx
+2. src/assets/baobab-canada-bg.png -> ton projet/src/assets/baobab-canada-bg.png
+
+Garde ton supabaseClient.js actuel.
+Puis lance : npm run dev
+
+Le formulaire conserve l'inscription, la connexion et la réinitialisation Supabase.

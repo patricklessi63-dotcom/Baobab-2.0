@@ -9,6 +9,100 @@
   <!-- Tailwind via CDN pour une mise en route rapide. Pour la production, envisager
        une vraie installation Tailwind (npm) avec purge CSS pour de meilleures performances. -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --bb-indigo: #1E2A4F;
+      --bb-indigo-deep: #141D38;
+      --bb-clay: #C1613D;
+      --bb-clay-deep: #A84E30;
+      --bb-ochre: #D9A441;
+      --bb-sand: #F8F5EF;
+      --bb-ink: #211B17;
+      --bb-border: rgba(33,27,23,0.10);
+      --bb-shadow-sm: 0 1px 2px rgba(20,29,56,0.06);
+      --bb-shadow-md: 0 6px 20px rgba(20,29,56,0.08);
+      --bb-shadow-lg: 0 16px 40px rgba(20,29,56,0.16);
+      --bb-radius-lg: 22px;
+      --bb-radius-md: 14px;
+      --bb-radius-sm: 11px;
+      --bb-ease: cubic-bezier(.4,0,.2,1);
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+    body { margin: 0; }
+
+    .bb-card {
+      background: #fff;
+      border: 1px solid var(--bb-border);
+      border-radius: var(--bb-radius-lg);
+      box-shadow: var(--bb-shadow-md);
+    }
+
+    .bb-input {
+      display: block;
+      border: 1px solid var(--bb-border);
+      border-radius: var(--bb-radius-sm);
+      padding: 12px 14px;
+      font-size: 14px;
+      background: #fff;
+      transition: border-color .15s var(--bb-ease), box-shadow .15s var(--bb-ease);
+    }
+    .bb-input::placeholder { color: rgba(33,27,23,0.38); }
+    .bb-input:focus {
+      outline: none;
+      border-color: var(--bb-clay);
+      box-shadow: 0 0 0 3px rgba(193,97,61,0.14);
+    }
+
+    .bb-btn { transition: transform .12s var(--bb-ease), box-shadow .18s var(--bb-ease), background .15s var(--bb-ease), opacity .15s var(--bb-ease); }
+    .bb-btn:active { transform: scale(0.96); }
+    .bb-btn:disabled { opacity: .55; cursor: not-allowed; }
+
+    .bb-btn-primary { background: var(--bb-indigo); color: var(--bb-sand); box-shadow: var(--bb-shadow-sm); }
+    .bb-btn-primary:hover:not(:disabled) { background: var(--bb-indigo-deep); box-shadow: var(--bb-shadow-md); }
+
+    .bb-btn-heart { background: var(--bb-clay); color: #fff; box-shadow: 0 8px 20px rgba(193,97,61,0.35); }
+    .bb-btn-heart:hover:not(:disabled) { background: var(--bb-clay-deep); box-shadow: 0 10px 24px rgba(193,97,61,0.45); transform: translateY(-1px); }
+
+    .bb-btn-pass { background: #fff; border: 1px solid var(--bb-border); color: var(--bb-ink); }
+    .bb-btn-pass:hover:not(:disabled) { border-color: rgba(33,27,23,0.28); background: rgba(33,27,23,0.03); }
+
+    .bb-pill {
+      border: 1px solid rgba(33,27,23,0.16);
+      color: var(--bb-ink);
+      transition: all .15s var(--bb-ease);
+    }
+    .bb-pill:hover { border-color: rgba(33,27,23,0.32); }
+    .bb-pill-active { background: var(--bb-ochre); color: var(--bb-indigo-deep); border-color: transparent; box-shadow: var(--bb-shadow-sm); }
+
+    .bb-badge {
+      background: var(--bb-sand);
+      border: 1px solid rgba(33,27,23,0.06);
+      color: var(--bb-ink);
+      font-weight: 600;
+      font-size: 12px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      letter-spacing: 0.01em;
+    }
+
+    .bb-fade-in { animation: bbFadeIn .28s var(--bb-ease); }
+    @keyframes bbFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    .bb-icon-btn { transition: background .15s var(--bb-ease), transform .12s var(--bb-ease); }
+    .bb-icon-btn:hover { background: rgba(20,29,56,0.65) !important; }
+    .bb-icon-btn:active { transform: scale(0.94); }
+
+    .bb-nav-btn { transition: background .15s var(--bb-ease), color .15s var(--bb-ease), transform .12s var(--bb-ease); }
+    .bb-nav-btn:hover { background: rgba(33,27,23,0.05) !important; }
+    .bb-nav-btn:active { transform: scale(0.95); }
+
+    ::selection { background: rgba(217,164,65,0.35); }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+    }
+  </style>
 </head>
 <body>
   <div id="root"></div>

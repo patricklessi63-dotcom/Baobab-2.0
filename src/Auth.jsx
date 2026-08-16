@@ -1,20 +1,35 @@
 import React, { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff, Mail, Lock, ArrowLeft, MapPin } from "lucide-react";
 import { supabase } from "./supabaseClient";
+import loginBackground from "./assets/baobab-canada-bg.png";
 
 const C = {
-  indigo: "#1E2A4F",
-  indigoDeep: "#141D38",
+  dusk: "#0F1526",
+  dusk3: "#232D52",
+  bark: "#8A6A52",
   clay: "#C1613D",
   ochre: "#D9A441",
+  acacia: "#8FAE86",
   sand: "#F2E9DC",
-  ink: "#2B2420",
+  sandDim: "rgba(242,233,220,0.72)",
 };
 
+function BaobabIcon({ size = 34 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 40 40" aria-hidden="true">
+      <path d="M20 30v8" stroke={C.ochre} strokeWidth="2.5" strokeLinecap="round" />
+      <ellipse cx="20" cy="16" rx="9" ry="10" fill={C.ochre} />
+      <path d="M13 9c-2-3-6-3-7-1M27 9c2-3 6-3 7-1M12 13c-3-1-6 1-6 3M28 13c3-1 6 1 6 3"
+        stroke={C.bark} strokeWidth="1.6" strokeLinecap="round" fill="none" />
+    </svg>
+  );
+}
+
 export default function Auth() {
-  const [mode, setMode] = useState("signin"); // signin | signup | reset
+  const [mode, setMode] = useState("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -24,115 +39,200 @@ export default function Auth() {
     setError("");
     setNotice("");
     setLoading(true);
+    const cleanEmail = email.trim();
+
     try {
       if (mode === "signup") {
-        const { error: signUpError } = await supabase.auth.signUp({ email, password });
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: cleanEmail, password,
+        });
         if (signUpError) throw signUpError;
         setNotice("Compte créé ! Vérifie ta boîte mail pour confirmer ton adresse, puis connecte-toi.");
         setMode("signin");
       } else if (mode === "signin") {
-        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: cleanEmail, password,
+        });
         if (signInError) throw signInError;
-      } else if (mode === "reset") {
-        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email);
+      } else {
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+          redirectTo: `${window.location.origin}/update-password`,
+        });
         if (resetError) throw resetError;
         setNotice("Email de réinitialisation envoyé, si ce compte existe.");
         setMode("signin");
       }
     } catch (e) {
-      setError(traduireErreur(e.message));
+      setError(traduireErreur(e));
     } finally {
       setLoading(false);
     }
   }
 
-  function traduireErreur(msg) {
-    if (!msg) return "Une erreur est survenue.";
-    if (msg.includes("Invalid login credentials")) return "Email ou mot de passe incorrect.";
-    if (msg.includes("User already registered")) return "Un compte existe déjà avec cet email.";
-    if (msg.includes("Password should be at least")) return "Le mot de passe doit contenir au moins 6 caractères.";
-    if (msg.includes("Unable to validate email address")) return "Adresse email invalide.";
-    return msg;
+  function traduireErreur(err) {
+    const code = err?.code;
+    const msg = err?.message || "";
+    if (code === "invalid_credentials" || msg.includes("Invalid login credentials"))
+      return "Email ou mot de passe incorrect.";
+    if (code === "user_already_exists" || msg.includes("User already registered"))
+      return "Un compte existe déjà avec cet email.";
+    if (code === "weak_password" || msg.includes("Password should be at least"))
+      return "Le mot de passe doit contenir au moins 6 caractères.";
+    if (code === "validation_failed" || msg.includes("Unable to validate email address"))
+      return "Adresse email invalide.";
+    if (code === "over_email_send_rate_limit" || msg.includes("rate limit"))
+      return "Trop de tentatives. Réessaie dans quelques minutes.";
+    if (!navigator.onLine) return "Pas de connexion internet.";
+    return msg || "Une erreur est survenue.";
   }
 
+  function switchMode(next) {
+    setMode(next);
+    setError("");
+    setNotice("");
+    setPassword("");
+    setShowPassword(false);
+  }
+
+  const title = mode === "signup" ? "Crée ton compte" :
+    mode === "reset" ? "Réinitialise ton mot de passe" : "Bienvenue sur Baobab";
+
+  const subtitle = mode === "signup"
+    ? "Rejoins une communauté d'immigrants au Canada."
+    : mode === "reset"
+    ? "Entre ton adresse email pour recevoir un nouveau lien."
+    : "Rencontre, échange et crée des connexions avec des immigrants partout au Canada.";
+
   return (
-    <div className="min-h-screen flex items-center justify-center px-6" style={{ background: C.sand, fontFamily: "system-ui, sans-serif", color: C.ink }}>
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <span style={{ fontFamily: "serif", fontStyle: "italic", fontWeight: 600, fontSize: 28, color: C.indigo }}>
-            Baobab
-          </span>
-          <p className="text-sm mt-2" style={{ color: "rgba(43,36,32,0.6)" }}>
-            {mode === "signup" ? "Crée ton compte" : mode === "reset" ? "Réinitialiser le mot de passe" : "Connecte-toi pour continuer"}
+    <main className="bb-auth min-h-screen relative flex items-center justify-center overflow-hidden px-4 py-6 sm:px-6"
+      style={{ fontFamily: "Inter, system-ui, sans-serif", color: C.sand, background: C.dusk }}>
+      <style>{`
+        @keyframes bbKenBurns { from { transform: scale(1.02); } to { transform: scale(1.09); } }
+        @keyframes bbRise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes bbWord { from { opacity: 0; transform: translateY(28px) rotateX(55deg); filter: blur(5px); } to { opacity: 1; transform: translateY(0) rotateX(0); filter: blur(0); } }
+        @keyframes bbGlow { 0%,100% { box-shadow: 0 0 0 0 rgba(217,164,65,.12); } 50% { box-shadow: 0 0 0 14px rgba(217,164,65,0); } }
+        @keyframes bbFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+        @keyframes bbShimmer { 0% { transform: translateX(-120%); } 100% { transform: translateX(220%); } }
+        .bb-auth .bb-bg { animation: bbKenBurns 18s ease-in-out alternate infinite; }
+        .bb-auth .bb-hero { animation: bbRise .8s cubic-bezier(.22,1,.36,1) both; }
+        .bb-auth .bb-card { animation: bbRise .9s .12s cubic-bezier(.22,1,.36,1) both; }
+        .bb-auth .bb-word { display:inline-block; opacity:0; animation: bbWord .7s cubic-bezier(.22,1,.36,1) both; transform-origin: 50% 100%; }
+        .bb-auth .bb-badge { animation: bbFloat 5s ease-in-out infinite; }
+        .bb-auth .bb-brand-icon { animation: bbGlow 3s ease-in-out infinite; }
+        .bb-auth .bb-submit { position:relative; overflow:hidden; }
+        .bb-auth .bb-submit::after { content:""; position:absolute; inset:0 auto 0 -40%; width:35%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.28),transparent); transform:skewX(-18deg); animation:bbShimmer 3.8s ease-in-out infinite; }
+        .bb-auth .bb-field { transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease, background .25s ease; }
+        .bb-auth .bb-field:focus-within { transform: translateY(-1px); border-color: rgba(217,164,65,.55) !important; box-shadow: 0 10px 30px rgba(0,0,0,.16), 0 0 0 3px rgba(217,164,65,.08); background: rgba(35,45,82,.92) !important; }
+        @media (prefers-reduced-motion: reduce) { .bb-auth * { animation: none !important; transition: none !important; } }
+      `}</style>
+
+      <div aria-hidden="true" className="bb-bg absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: `url(${loginBackground})`, backgroundPosition: "center center" }} />
+
+      <div aria-hidden="true" className="absolute inset-0"
+        style={{ background: "linear-gradient(90deg, rgba(8,13,30,0.08) 0%, rgba(8,13,30,0.18) 32%, rgba(8,13,30,0.72) 57%, rgba(8,13,30,0.96) 100%)" }} />
+
+      <div aria-hidden="true" className="absolute inset-0 md:hidden"
+        style={{ background: "linear-gradient(180deg, rgba(8,13,30,0.20), rgba(8,13,30,0.58) 35%, rgba(8,13,30,0.96) 72%, rgba(8,13,30,1) 100%)" }} />
+
+      <div className="bb-hero relative z-10 hidden md:block w-full max-w-6xl mr-auto">
+        <div className="max-w-lg pl-4 lg:pl-10">
+          <div className="bb-badge inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold"
+            style={{ background: "rgba(15,21,38,0.52)", border: "1px solid rgba(242,233,220,0.16)", backdropFilter: "blur(12px)" }}>
+            <MapPin size={14} color={C.ochre} /> Une communauté partout au Canada
+          </div>
+          <h2 className="mt-5 text-4xl lg:text-6xl font-bold leading-[1.05]" style={{ fontFamily: "Fraunces, serif", perspective: "700px" }}>
+            <span className="bb-word" style={{ animationDelay: ".12s" }}>Nouvelle</span> <span className="bb-word" style={{ animationDelay: ".2s" }}>vie.</span><br />
+            <span className="bb-word" style={{ color: C.ochre, animationDelay: ".34s" }}>Nouvelles</span> <span className="bb-word" style={{ color: C.ochre, animationDelay: ".42s" }}>connexions.</span>
+          </h2>
+          <p className="mt-5 max-w-md text-base lg:text-lg leading-7" style={{ color: C.sandDim }}>
+            Baobab rapproche les immigrants au Canada pour l'amour, l'amitié, les rencontres et les nouvelles communautés.
           </p>
         </div>
-
-        {error && (
-          <div className="mb-4 text-sm px-3 py-2 rounded-lg" style={{ background: "#fce8e0", color: C.clay }}>
-            {error}
-          </div>
-        )}
-        {notice && (
-          <div className="mb-4 text-sm px-3 py-2 rounded-lg" style={{ background: "#e8f0e3", color: "#2f5233" }}>
-            {notice}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <input
-            type="email"
-            placeholder="Adresse email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="p-3 rounded-lg text-sm"
-            style={{ border: "1px solid rgba(43,36,32,0.15)" }}
-          />
-          {mode !== "reset" && (
-            <input
-              type="password"
-              placeholder="Mot de passe"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              className="p-3 rounded-lg text-sm"
-              style={{ border: "1px solid rgba(43,36,32,0.15)" }}
-            />
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="mt-2 py-3 rounded-full font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60"
-            style={{ background: C.indigo, color: C.sand }}
-          >
-            {loading && <Loader2 size={16} className="animate-spin" />}
-            {mode === "signup" ? "Créer mon compte" : mode === "reset" ? "Envoyer le lien" : "Se connecter"}
-          </button>
-        </form>
-
-        <div className="mt-5 text-center text-xs flex flex-col gap-2" style={{ color: "rgba(43,36,32,0.6)" }}>
-          {mode === "signin" && (
-            <>
-              <button onClick={() => { setMode("reset"); setError(""); setNotice(""); }} style={{ color: C.indigo }}>
-                Mot de passe oublié ?
-              </button>
-              <span>
-                Pas encore de compte ?{" "}
-                <button onClick={() => { setMode("signup"); setError(""); setNotice(""); }} className="font-semibold" style={{ color: C.clay }}>
-                  Inscris-toi
-                </button>
-              </span>
-            </>
-          )}
-          {mode !== "signin" && (
-            <button onClick={() => { setMode("signin"); setError(""); setNotice(""); }} style={{ color: C.indigo }}>
-              ← Retour à la connexion
-            </button>
-          )}
-        </div>
       </div>
-    </div>
+
+      <section className="relative z-20 w-full max-w-md md:absolute md:right-[5vw] lg:right-[7vw]" aria-label="Authentification Baobab">
+        <div className="bb-card rounded-[30px] p-5 sm:p-7 md:p-8"
+          style={{ background: "rgba(15,21,38,0.80)", border: "1px solid rgba(242,233,220,0.16)",
+            boxShadow: "0 30px 90px rgba(0,0,0,0.52)", backdropFilter: "blur(22px)", WebkitBackdropFilter: "blur(22px)" }}>
+
+          <div className="flex items-center gap-3 mb-6">
+            <div className="bb-brand-icon flex h-12 w-12 items-center justify-center rounded-2xl"
+              style={{ background: "rgba(217,164,65,0.12)", border: "1px solid rgba(217,164,65,0.25)" }}>
+              <BaobabIcon />
+            </div>
+            <div>
+              <div style={{ fontFamily: "Fraunces, serif", fontStyle: "italic", fontWeight: 600, fontSize: 28, lineHeight: 1 }}>Baobab</div>
+              <div className="mt-1" style={{ fontSize: 9, letterSpacing: "0.22em", color: C.sandDim }}>BY LESSI PATRICK</div>
+            </div>
+          </div>
+
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            {title.split(" ").map((word, i) => <span key={`${word}-${i}`} className="bb-word mr-[.28em]" style={{ animationDelay: `${.28 + i * .055}s` }}>{word}</span>)}
+          </h1>
+          <p className="bb-hero mt-2 text-sm leading-6" style={{ color: C.sandDim }}>{subtitle}</p>
+
+          {error && <div role="alert" className="mt-5 rounded-2xl px-4 py-3 text-sm"
+            style={{ background: "rgba(193,97,61,0.15)", color: "#F4A48C", border: "1px solid rgba(193,97,61,0.28)" }}>{error}</div>}
+
+          {notice && <div role="status" className="mt-5 rounded-2xl px-4 py-3 text-sm"
+            style={{ background: "rgba(143,174,134,0.15)", color: "#B9D5B2", border: "1px solid rgba(143,174,134,0.25)" }}>{notice}</div>}
+
+          <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+            <div>
+              <label htmlFor="email" className="mb-2 block text-xs font-semibold" style={{ color: C.sandDim }}>Adresse email</label>
+              <div className="bb-field flex items-center gap-3 rounded-2xl px-4"
+                style={{ background: "rgba(35,45,82,0.78)", border: "1px solid rgba(242,233,220,0.11)" }}>
+                <Mail size={17} color={C.sandDim} />
+                <input id="email" type="email" placeholder="exemple@email.com" value={email}
+                  onChange={(e) => setEmail(e.target.value)} required autoComplete="email"
+                  className="min-w-0 flex-1 bg-transparent py-3.5 text-sm outline-none" style={{ color: C.sand }} />
+              </div>
+            </div>
+
+            {mode !== "reset" && <div>
+              <div className="mb-2 flex items-center justify-between">
+                <label htmlFor="password" className="text-xs font-semibold" style={{ color: C.sandDim }}>Mot de passe</label>
+                {mode === "signin" && <button type="button" onClick={() => switchMode("reset")} className="text-xs font-semibold" style={{ color: C.ochre }}>Mot de passe oublié ?</button>}
+              </div>
+              <div className="bb-field flex items-center gap-3 rounded-2xl px-4"
+                style={{ background: "rgba(35,45,82,0.78)", border: "1px solid rgba(242,233,220,0.11)" }}>
+                <Lock size={17} color={C.sandDim} />
+                <input id="password" type={showPassword ? "text" : "password"} placeholder="••••••••" value={password}
+                  onChange={(e) => setPassword(e.target.value)} required minLength={6}
+                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                  className="min-w-0 flex-1 bg-transparent py-3.5 text-sm outline-none" style={{ color: C.sand }} />
+                <button type="button" aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                  onClick={() => setShowPassword((v) => !v)} style={{ color: C.sandDim }}>
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>}
+
+            <button type="submit" disabled={loading}
+              className="bb-submit mt-1 flex items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-bold transition-transform duration-200 hover:scale-[1.01] disabled:opacity-60"
+              style={{ background: `linear-gradient(135deg, ${C.clay}, #A94F30)`, color: "#FFF8EF", boxShadow: "0 14px 32px -10px rgba(193,97,61,.65)" }}>
+              {loading && <Loader2 size={17} className="animate-spin" />}
+              {mode === "signup" ? "Créer mon compte" : mode === "reset" ? "Envoyer le lien" : "Se connecter"}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center text-xs" style={{ color: C.sandDim }}>
+            {mode === "signin" && <span>Pas encore de compte ?{" "}
+              <button onClick={() => switchMode("signup")} className="font-bold" style={{ color: C.ochre }}>Inscris-toi</button>
+            </span>}
+            {mode !== "signin" && <button onClick={() => switchMode("signin")} className="inline-flex items-center gap-1 font-semibold" style={{ color: C.ochre }}>
+              <ArrowLeft size={14} /> Retour à la connexion
+            </button>}
+          </div>
+
+          <div className="mt-7 border-t pt-5 text-center text-[10px]"
+            style={{ borderColor: "rgba(242,233,220,0.10)", color: "rgba(242,233,220,0.42)" }}>
+            <div className="flex justify-center gap-4"><button type="button">Confidentialité</button><span>•</span><button type="button">Conditions</button><span>•</span><button type="button">À propos</button></div>
+            <div className="mt-3" style={{ fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.08em" }}>BAOBAB — BY LESSI PATRICK</div>
+          </div>
+        </div>
+      </section>
+    </main>
   );
 }
