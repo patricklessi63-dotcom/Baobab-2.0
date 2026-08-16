@@ -35,6 +35,23 @@ function formatLastSeen(iso) {
   return `Vu il y a ${days} j`;
 }
 
+function formatMessageTime(iso) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleTimeString("fr-CA", { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatDayLabel(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const sameDay = (a, b) => a.toDateString() === b.toDateString();
+  if (sameDay(d, today)) return "Aujourd'hui";
+  if (sameDay(d, yesterday)) return "Hier";
+  return d.toLocaleDateString("fr-CA", { day: "numeric", month: "long" });
+}
+
 function Avatar({ name, size = 44, url }) {
   const initial = (name || "?").trim().charAt(0).toUpperCase();
   if (url) {
@@ -123,6 +140,12 @@ function SocialShell({
   const photoInputRef = useRef(null);
   const videoInputRef = useRef(null);
 
+  const [swipeX, setSwipeX] = useState(0);
+  const [swiping, setSwiping] = useState(false);
+  const [swipeExit, setSwipeExit] = useState(null); // "like" | "pass" | null
+  const [discoverPhotoIndex, setDiscoverPhotoIndex] = useState(0);
+  const swipeStartRef = useRef(0);
+
   const primary = "#151B3D";
   const green = "#2F8F6B";
   const coral = "#E56B5D";
@@ -142,6 +165,43 @@ function SocialShell({
     !search.trim() ||
     `${p.name} ${p.city || ""} ${p.country || ""} ${p.occupation || ""}`.toLowerCase().includes(search.trim().toLowerCase())
   );
+
+  const topPerson = filteredPeople[0] || null;
+  const topPhotos = topPerson
+    ? (profilePhotos[topPerson.id]?.length ? profilePhotos[topPerson.id] : (topPerson.avatar_url ? [{ url: topPerson.avatar_url }] : []))
+    : [];
+
+  useEffect(() => {
+    setDiscoverPhotoIndex(0);
+    setSwipeX(0);
+    setSwipeExit(null);
+    setSwiping(false);
+  }, [topPerson?.id]);
+
+  const decideSwipe = (dir) => {
+    if (!topPerson || swipeExit) return;
+    setSwipeExit(dir);
+    setTimeout(() => {
+      dir === "like" ? handleLike(topPerson) : handlePass(topPerson);
+    }, 240);
+  };
+
+  const onSwipeStart = (clientX) => {
+    if (swipeExit) return;
+    swipeStartRef.current = clientX;
+    setSwiping(true);
+  };
+  const onSwipeMove = (clientX) => {
+    if (!swiping || swipeExit) return;
+    setSwipeX(clientX - swipeStartRef.current);
+  };
+  const onSwipeEnd = () => {
+    if (!swiping || swipeExit) return;
+    setSwiping(false);
+    if (swipeX > 110) decideSwipe("like");
+    else if (swipeX < -110) decideSwipe("pass");
+    else setSwipeX(0);
+  };
 
   const publish = () => {
     if (!draft.trim() && !composerMedia) return;
@@ -527,7 +587,7 @@ function SocialShell({
             <div className="text-center mb-6">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider" style={{ background: "#FFF1EC", color: coral }}><Heart size={13} fill={coral} /> Connexions qui ont du sens</div>
               <h1 className="text-3xl md:text-4xl font-black tracking-tight mt-3" style={{ color: primary }}>Découvrir</h1>
-              <p className="text-sm mt-1" style={{ color: muted }}>Des personnes qui comprennent ton nouveau départ.</p>
+              <p className="text-sm mt-1" style={{ color: muted }}>Glisse à droite pour aimer, à gauche pour passer.</p>
             </div>
             {filteredPeople.length === 0 ? (
               <div className={`${card} p-10 text-center`}>
@@ -536,40 +596,98 @@ function SocialShell({
                 <p className="text-sm mt-2" style={{ color: muted }}>Invite des amis africains installés au Canada à rejoindre Baobab.</p>
                 <button onClick={() => navigator.clipboard?.writeText(window.location.href)} className="mt-5 px-5 py-3 rounded-xl text-white font-bold" style={{ background: primary }}>Inviter ma communauté</button>
               </div>
-            ) : (() => {
-              const p = filteredPeople[0];
-              const photos = profilePhotos[p.id]?.length ? profilePhotos[p.id] : (p.avatar_url ? [{ url: p.avatar_url }] : []);
-              const photo = photos[0]?.url;
-              return (
-                <div className="bg-white rounded-[34px] overflow-hidden border shadow-[0_24px_80px_rgba(21,27,61,.15)]">
-                  <div className="h-[500px] relative overflow-hidden" style={{ background: photo ? `linear-gradient(180deg,rgba(21,27,61,.05) 35%,rgba(21,27,61,.88)),url(${photo}) center/cover` : `linear-gradient(145deg,${primary},${green},${gold})` }}>
-                    {!photo && <div className="absolute inset-0 flex items-center justify-center text-8xl">🌍</div>}
-                    <div className="absolute top-4 left-4 flex gap-2">
-                      <span className="px-3 py-1.5 rounded-full bg-white/15 backdrop-blur-md text-white text-[11px] font-bold">{p.city || "Canada"}</span>
-                      {p.country && <span className="px-3 py-1.5 rounded-full bg-white/15 backdrop-blur-md text-white text-[11px] font-bold">🇨🇲 {p.country}</span>}
-                    </div>
-                    <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                      <div className="text-3xl font-black">{p.name}, {p.age}</div>
-                      <div className="text-sm text-white/75 mt-1">📍 {p.city || "Canada"} · {p.occupation || "Nouveau membre"}</div>
-                      {p.bio && <p className="text-sm text-white/80 mt-3 leading-6 max-w-lg">{p.bio}</p>}
-                      <div className="flex flex-wrap gap-2 mt-4">
-                        {p.languages && <span className="px-2.5 py-1 rounded-full bg-white/12 text-xs">🗣 {p.languages}</span>}
-                        {p.arrived_since && <span className="px-2.5 py-1 rounded-full bg-white/12 text-xs">✈️ Au Canada depuis {p.arrived_since}</span>}
-                        {p.looking_for && <span className="px-2.5 py-1 rounded-full bg-white/12 text-xs">♡ {p.looking_for}</span>}
+            ) : (
+              <div className="relative h-[620px] select-none" style={{ touchAction: "pan-y" }}>
+                <style>{`
+                  @keyframes bbCardIn { from { opacity: 0; transform: scale(.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+                  .bb-swipe-card { animation: bbCardIn .35s cubic-bezier(.22,1,.36,1) both; }
+                `}</style>
+
+                {/* Pile de cartes derrière, purement visuelle */}
+                {filteredPeople[2] && (
+                  <div className="absolute inset-0 bg-white rounded-[34px] border" style={{ transform: "scale(0.92) translateY(22px)", opacity: 0.5 }} />
+                )}
+                {filteredPeople[1] && (
+                  <div className="absolute inset-0 bg-white rounded-[34px] border overflow-hidden" style={{ transform: "scale(0.96) translateY(11px)", opacity: 0.8 }}>
+                    <div className="h-full" style={{ background: `linear-gradient(145deg,${primary},${green},${gold})`, opacity: 0.5 }} />
+                  </div>
+                )}
+
+                {(() => {
+                  const p = topPerson;
+                  const photos = topPhotos;
+                  const photo = photos[discoverPhotoIndex]?.url || photos[0]?.url;
+                  const rotate = swipeX / 18;
+                  const isExiting = Boolean(swipeExit);
+                  const exitX = swipeExit === "like" ? 640 : swipeExit === "pass" ? -640 : 0;
+                  const transform = `translateX(${isExiting ? exitX : swipeX}px) rotate(${isExiting ? rotate * 2.5 : rotate}deg)`;
+                  const likeOpacity = Math.min(Math.max(swipeX, 0) / 100, 1);
+                  const passOpacity = Math.min(Math.max(-swipeX, 0) / 100, 1);
+
+                  return (
+                    <div
+                      className="bb-swipe-card absolute inset-0 bg-white rounded-[34px] overflow-hidden border shadow-[0_24px_80px_rgba(21,27,61,.18)] cursor-grab active:cursor-grabbing"
+                      style={{ transform, opacity: isExiting ? 0.4 : 1, transition: swiping ? "none" : "transform .35s cubic-bezier(.22,1,.36,1), opacity .35s" }}
+                      onPointerDown={(e) => onSwipeStart(e.clientX)}
+                      onPointerMove={(e) => onSwipeMove(e.clientX)}
+                      onPointerUp={onSwipeEnd}
+                      onPointerLeave={() => swiping && onSwipeEnd()}
+                    >
+                      <div className="h-[500px] relative overflow-hidden" style={{ background: photo ? `linear-gradient(180deg,rgba(21,27,61,.05) 35%,rgba(21,27,61,.88)),url(${photo}) center/cover` : `linear-gradient(145deg,${primary},${green},${gold})` }}>
+                        {!photo && <div className="absolute inset-0 flex items-center justify-center text-8xl">🌍</div>}
+
+                        {photos.length > 1 && (
+                          <div className="absolute top-3 left-3 right-3 flex gap-1.5 z-10">
+                            {photos.map((_, i) => (
+                              <div key={i} className="h-[3px] flex-1 rounded-full bg-white/30 overflow-hidden">
+                                <div className="h-full bg-white" style={{ width: i === discoverPhotoIndex ? "100%" : i < discoverPhotoIndex ? "100%" : "0%" }} />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {photos.length > 1 && (
+                          <>
+                            <button onClick={() => setDiscoverPhotoIndex((i) => Math.max(0, i - 1))} className="absolute left-0 top-0 bottom-24 w-1/3 z-[5]" aria-label="Photo précédente" />
+                            <button onClick={() => setDiscoverPhotoIndex((i) => Math.min(photos.length - 1, i + 1))} className="absolute right-0 top-0 bottom-24 w-1/3 z-[5]" aria-label="Photo suivante" />
+                          </>
+                        )}
+
+                        <div className="absolute top-4 left-4 flex gap-2 z-10">
+                          <span className="px-3 py-1.5 rounded-full bg-white/15 backdrop-blur-md text-white text-[11px] font-bold">{p.city || "Canada"}</span>
+                          {p.country && <span className="px-3 py-1.5 rounded-full bg-white/15 backdrop-blur-md text-white text-[11px] font-bold">🌍 {p.country}</span>}
+                        </div>
+
+                        <div className="absolute top-16 left-6 border-4 rounded-2xl px-3 py-1 z-10" style={{ borderColor: "#27C56D", transform: `rotate(-14deg)`, opacity: likeOpacity }}>
+                          <span className="text-lg font-black tracking-widest" style={{ color: "#27C56D" }}>OUI</span>
+                        </div>
+                        <div className="absolute top-16 right-6 border-4 rounded-2xl px-3 py-1 z-10" style={{ borderColor: coral, transform: `rotate(14deg)`, opacity: passOpacity }}>
+                          <span className="text-lg font-black tracking-widest" style={{ color: coral }}>PASSER</span>
+                        </div>
+
+                        <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+                          <div className="text-3xl font-black">{p.name}, {p.age}</div>
+                          <div className="text-sm text-white/75 mt-1">📍 {p.city || "Canada"} · {p.occupation || "Nouveau membre"}</div>
+                          {p.bio && <p className="text-sm text-white/80 mt-3 leading-6 max-w-lg">{p.bio}</p>}
+                          <div className="flex flex-wrap gap-2 mt-4">
+                            {p.languages && <span className="px-2.5 py-1 rounded-full bg-white/12 text-xs">🗣 {p.languages}</span>}
+                            {p.arrived_since && <span className="px-2.5 py-1 rounded-full bg-white/12 text-xs">✈️ Au Canada depuis {p.arrived_since}</span>}
+                            {p.looking_for && <span className="px-2.5 py-1 rounded-full bg-white/12 text-xs">♡ {p.looking_for}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-5 md:p-6">
+                        {p.interests && <div className="mb-4"><div className="text-[11px] font-black uppercase tracking-wider" style={{ color: muted }}>Centres d'intérêt</div><div className="text-sm mt-1">{p.interests}</div></div>}
+                        <div className="flex items-center justify-center gap-5">
+                          <button onClick={() => decideSwipe("pass")} className={`${buttonBase} h-16 w-16 rounded-full border-2 flex items-center justify-center bg-white`} style={{ borderColor: "#E5E7EF" }}><X size={28} color={muted} /></button>
+                          <button onClick={() => decideSwipe("like")} className={`${buttonBase} h-[72px] w-[72px] rounded-full text-white flex items-center justify-center shadow-xl`} style={{ background: `linear-gradient(135deg,${coral},#D94F70)` }}><Heart size={30} fill="white" /></button>
+                        </div>
+                        <div className="text-center text-[11px] mt-3" style={{ color: muted }}>♥ Oui si tu veux faire connaissance · × Passer</div>
                       </div>
                     </div>
-                  </div>
-                  <div className="p-5 md:p-6">
-                    {p.interests && <div className="mb-4"><div className="text-[11px] font-black uppercase tracking-wider" style={{ color: muted }}>Centres d'intérêt</div><div className="text-sm mt-1">{p.interests}</div></div>}
-                    <div className="flex items-center justify-center gap-5">
-                      <button onClick={() => handlePass(p)} className={`${buttonBase} h-16 w-16 rounded-full border-2 flex items-center justify-center bg-white`} style={{ borderColor: "#E5E7EF" }}><X size={28} color={muted} /></button>
-                      <button onClick={() => handleLike(p)} className={`${buttonBase} h-[72px] w-[72px] rounded-full text-white flex items-center justify-center shadow-xl`} style={{ background: `linear-gradient(135deg,${coral},#D94F70)` }}><Heart size={30} fill="white" /></button>
-                    </div>
-                    <div className="text-center text-[11px] mt-3" style={{ color: muted }}>♥ Oui si tu veux faire connaissance · × Passer</div>
-                  </div>
-                </div>
-              );
-            })()}
+                  );
+                })()}
+              </div>
+            )}
           </section>
         )}
 
@@ -584,12 +702,23 @@ function SocialShell({
                 <button onClick={() => goTab("discover")} className="mt-5 px-5 py-3 rounded-xl text-white font-bold" style={{ background: primary }}>Découvrir des profils</button>
               </div>
             ) : (
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1.5">
                 {matches.map((m) => (
-                  <button key={m.id} onClick={() => openChat(m)} className={`${card} ${buttonBase} p-4 flex items-center gap-3 text-left`}>
-                    <div className="relative"><Avatar name={m.name} url={m.avatar_url} size={58} /><span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white" style={{ background: m.is_online ? "#27C56D" : "#B9BEC9" }} /></div>
-                    <div className="min-w-0 flex-1"><div className="font-bold">{m.name}</div><div className="text-xs mt-1" style={{ color: muted }}>{m.is_online ? "En ligne maintenant" : "Hors ligne"} · {m.city || "Canada"}</div><div className="text-xs mt-2 font-semibold" style={{ color: coral }}>Ouvrir la conversation →</div></div>
-                    <MessageCircle size={19} color={primary} />
+                  <button key={m.id} onClick={() => openChat(m)} className={`${card} ${buttonBase} p-3.5 flex items-center gap-3.5 text-left w-full`}>
+                    <div className="relative flex-shrink-0">
+                      <Avatar name={m.name} url={m.avatar_url} size={54} />
+                      <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white" style={{ background: m.is_online ? "#27C56D" : "#B9BEC9" }} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold truncate">{m.name}</span>
+                        <span className="text-[11px] flex-shrink-0" style={{ color: m.is_online ? green : muted }}>{m.is_online ? "En ligne" : "Hors ligne"}</span>
+                      </div>
+                      <div className="text-xs mt-1 truncate" style={{ color: muted }}>{m.city || "Canada"} · Dites bonjour 👋</div>
+                    </div>
+                    <div className="h-9 w-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#FFF3F1" }}>
+                      <MessageCircle size={16} color={coral} />
+                    </div>
                   </button>
                 ))}
               </div>
@@ -1967,18 +2096,42 @@ export default function App() {
               )}
             </div>
 
-            <div className="flex-1 p-4 flex flex-col gap-2 overflow-y-auto">
+            <div className="flex-1 p-4 flex flex-col gap-1 overflow-y-auto">
               {messages.length === 0 && (
                 <p className="text-xs text-center mt-6" style={{ color: "rgba(43,36,32,0.45)" }}>Dites bonjour 👋</p>
               )}
-              {messages.map((m) => (
-                <div key={m.id} className="bb-fade-in max-w-[75%] text-sm px-3.5 py-2.5 rounded-2xl"
-                  style={m.from_id === currentUser.id
-                    ? { alignSelf: "flex-end", background: C.indigo, color: C.sand, borderBottomRightRadius: 4, boxShadow: "var(--bb-shadow-sm)" }
-                    : { alignSelf: "flex-start", background: C.sand, color: C.ink, borderBottomLeftRadius: 4 }}>
-                  {m.text}
-                </div>
-              ))}
+              {messages.map((m, i) => {
+                const prev = messages[i - 1];
+                const showDaySeparator = !prev || formatDayLabel(prev.created_at) !== formatDayLabel(m.created_at);
+                const isMine = m.from_id === currentUser.id;
+                const groupedWithPrev = prev && !showDaySeparator && prev.from_id === m.from_id;
+                return (
+                  <React.Fragment key={m.id}>
+                    {showDaySeparator && (
+                      <div className="flex justify-center my-3">
+                        <span className="text-[11px] font-semibold px-3 py-1 rounded-full" style={{ background: "rgba(43,36,32,0.06)", color: "rgba(43,36,32,0.5)" }}>
+                          {formatDayLabel(m.created_at)}
+                        </span>
+                      </div>
+                    )}
+                    <div
+                      className="bb-fade-in max-w-[75%] text-sm px-3.5 py-2.5 rounded-2xl flex items-end gap-1.5"
+                      style={{
+                        ...(isMine
+                          ? { alignSelf: "flex-end", background: C.indigo, color: C.sand, borderBottomRightRadius: 4, boxShadow: "var(--bb-shadow-sm)" }
+                          : { alignSelf: "flex-start", background: C.sand, color: C.ink, borderBottomLeftRadius: 4 }),
+                        marginTop: groupedWithPrev ? 2 : 10,
+                      }}
+                    >
+                      <span>{m.text}</span>
+                      <span className="text-[10px] flex-shrink-0 flex items-center gap-0.5" style={{ opacity: 0.6, whiteSpace: "nowrap" }}>
+                        {formatMessageTime(m.created_at)}
+                        {isMine && <CheckCheck size={12} />}
+                      </span>
+                    </div>
+                  </React.Fragment>
+                );
+              })}
             </div>
 
             {messages.length === 0 && (
