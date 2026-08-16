@@ -57,7 +57,7 @@ export default function CreateProfileForm({
         <div className="flex gap-2 flex-wrap">
           {LOOKING_FOR.map((opt) => (
             <button type="button" key={opt} onClick={() => setForm({ ...form, lookingFor: opt })}
-              className={`bb-pill text-xs font-semibold px-3 py-2 rounded-full ${form.lookingFor === opt ? "bb-pill-active" : ""}`}>
+              className={`bb-pill text-xs font-semibold px-3.5 py-2.5 rounded-full ${form.lookingFor === opt ? "bb-pill-active" : ""}`}>
               {opt}
             </button>
           ))}
@@ -73,7 +73,7 @@ export default function CreateProfileForm({
           <div className="flex gap-2 flex-wrap">
             {EDUCATION_LEVELS.map((opt) => (
               <button type="button" key={opt} onClick={() => setForm({ ...form, educationLevel: opt })}
-                className={`bb-pill text-xs font-semibold px-3 py-2 rounded-full ${form.educationLevel === opt ? "bb-pill-active" : ""}`}>
+                className={`bb-pill text-xs font-semibold px-3.5 py-2.5 rounded-full ${form.educationLevel === opt ? "bb-pill-active" : ""}`}>
                 {opt}
               </button>
             ))}
@@ -85,7 +85,7 @@ export default function CreateProfileForm({
           <div className="flex gap-2">
             {HAS_CHILDREN_OPTIONS.map((opt) => (
               <button type="button" key={opt} onClick={() => setForm({ ...form, hasChildren: opt })}
-                className={`bb-pill text-xs font-semibold px-3 py-2 rounded-full ${form.hasChildren === opt ? "bb-pill-active" : ""}`}>
+                className={`bb-pill text-xs font-semibold px-3.5 py-2.5 rounded-full ${form.hasChildren === opt ? "bb-pill-active" : ""}`}>
                 {opt}
               </button>
             ))}

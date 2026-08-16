@@ -31,7 +31,7 @@ export default function ChatScreen({
   return (
     <div className="flex flex-col flex-1 max-w-md mx-auto w-full">
       <div className="flex items-center gap-3 p-4" style={{ borderBottom: "1px solid rgba(43,36,32,0.1)", position: "relative" }}>
-        <button onClick={() => setView("feed")}><ArrowLeft size={18} /></button>
+        <button onClick={() => setView("feed")} className="flex items-center justify-center flex-shrink-0" style={{ width: 44, height: 44, marginLeft: -12 }}><ArrowLeft size={18} /></button>
         <div style={{ position: "relative" }}>
           <Avatar name={activeMatch.name} url={activeMatch.avatar_url} size={34} />
           <Circle
@@ -50,8 +50,8 @@ export default function ChatScreen({
             {otherTyping ? "en train d'écrire…" : activeMatch.is_online ? "En ligne" : formatLastSeen(activeMatch.last_seen)}
           </div>
         </div>
-        <button onClick={() => refreshMessages(activeMatch)} className="ml-auto text-xs" style={{ color: C.indigo }}>Actualiser</button>
-        <button onClick={() => setMenuOpenFor(menuOpenFor === activeMatch.id ? null : activeMatch.id)} className="ml-1">
+        <button onClick={() => refreshMessages(activeMatch)} className="ml-auto text-xs flex items-center justify-center" style={{ color: C.indigo, minHeight: 44, padding: "0 8px" }}>Actualiser</button>
+        <button onClick={() => setMenuOpenFor(menuOpenFor === activeMatch.id ? null : activeMatch.id)} className="flex items-center justify-center flex-shrink-0" style={{ width: 40, height: 44 }}>
           <MoreVertical size={18} color={C.ink} />
         </button>
         {menuOpenFor === activeMatch.id && (

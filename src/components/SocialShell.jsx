@@ -548,7 +548,7 @@ export default function SocialShell({
                           <div className="p-2.5">
                             <div className="text-xs font-bold truncate">{p.name}, {p.age}</div>
                             <div className="text-[10px] truncate mt-0.5" style={{ color: muted }}>{p.city || "Canada"}</div>
-                            <button onClick={() => handleLike(p)} className="w-full mt-2 rounded-lg py-1.5 text-[11px] font-bold" style={{ background: "#FFF3F1", color: coral }}>
+                            <button onClick={() => handleLike(p)} className="w-full mt-2 rounded-lg py-2.5 text-[11px] font-bold" style={{ background: "#FFF3F1", color: coral }}>
                               <Heart size={11} className="inline mr-1" />J'aime
                             </button>
                           </div>
@@ -579,7 +579,7 @@ export default function SocialShell({
                           <div className="p-2.5">
                             <div className="text-xs font-bold truncate">{p.name}, {p.age}</div>
                             <div className="text-[10px] truncate mt-0.5" style={{ color: muted }}>{p.city}</div>
-                            <button onClick={() => handleLike(p)} className="w-full mt-2 rounded-lg py-1.5 text-[11px] font-bold" style={{ background: "#EEF8F4", color: green }}>
+                            <button onClick={() => handleLike(p)} className="w-full mt-2 rounded-lg py-2.5 text-[11px] font-bold" style={{ background: "#EEF8F4", color: green }}>
                               <Heart size={11} className="inline mr-1" />J'aime
                             </button>
                           </div>

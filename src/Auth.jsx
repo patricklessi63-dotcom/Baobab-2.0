@@ -202,7 +202,7 @@ export default function Auth() {
             {mode !== "reset" && <div>
               <div className="mb-2 flex items-center justify-between">
                 <label htmlFor="password" className="text-xs font-semibold" style={{ color: C.sandDim }}>Mot de passe</label>
-                {mode === "signin" && <button type="button" onClick={() => switchMode("reset")} className="text-xs font-semibold" style={{ color: C.ochre }}>Mot de passe oublié ?</button>}
+                {mode === "signin" && <button type="button" onClick={() => switchMode("reset")} className="bb-tap text-xs font-semibold flex items-center" style={{ color: C.ochre }}>Mot de passe oublié ?</button>}
               </div>
               <div className="bb-field flex items-center gap-3 rounded-2xl px-4"
                 style={{ background: "rgba(35,45,82,0.78)", border: "1px solid rgba(242,233,220,0.11)" }}>
@@ -212,7 +212,7 @@ export default function Auth() {
                   autoComplete={mode === "signup" ? "new-password" : "current-password"}
                   className="min-w-0 flex-1 bg-transparent py-4 text-sm outline-none" style={{ color: C.sand }} />
                 <button type="button" aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
-                  onClick={() => setShowPassword((v) => !v)} className="bb-tap flex items-center justify-center" style={{ color: C.sandDim, width: 32 }}>
+                  onClick={() => setShowPassword((v) => !v)} className="bb-tap flex items-center justify-center flex-shrink-0" style={{ color: C.sandDim, width: 44, marginRight: -8 }}>
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>

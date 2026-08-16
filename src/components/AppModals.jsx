@@ -75,18 +75,19 @@ export default function AppModals({
             </div>
 
             <div className="text-[11px] font-black uppercase tracking-wider mt-2" style={{ color: "rgba(43,36,32,0.4)" }}>Confidentialité</div>
-            <div className="flex items-center justify-between py-2.5" style={{ borderTop: "1px solid rgba(43,36,32,0.08)" }}>
+            <label className="flex items-center justify-between py-2.5" style={{ borderTop: "1px solid rgba(43,36,32,0.08)", minHeight: 44 }}>
               <div className="flex items-center gap-2 text-sm"><Circle size={14} color={C.acacia || C.ochre} /> Statut en ligne visible</div>
               <input
                 type="checkbox"
                 checked={currentUser?.show_online_status !== false}
                 onChange={(e) => onToggleOnlineStatus?.(e.target.checked)}
+                style={{ width: 18, height: 18 }}
               />
-            </div>
-            <div className="flex items-center justify-between py-2.5" style={{ borderTop: "1px solid rgba(43,36,32,0.08)" }}>
+            </label>
+            <label className="flex items-center justify-between py-2.5" style={{ borderTop: "1px solid rgba(43,36,32,0.08)", minHeight: 44 }}>
               <div className="flex items-center gap-2 text-sm"><Bell size={14} color={C.ochre} /> Notifications</div>
-              <input type="checkbox" defaultChecked />
-            </div>
+              <input type="checkbox" defaultChecked style={{ width: 18, height: 18 }} />
+            </label>
             <div className="flex items-center justify-between py-2.5" style={{ borderTop: "1px solid rgba(43,36,32,0.08)" }}>
               <div className="flex items-center gap-2 text-sm"><Moon size={14} color={C.indigo} /> Mode sombre</div>
               <span className="text-xs" style={{ color: "rgba(43,36,32,0.4)" }}>Bientôt</span>

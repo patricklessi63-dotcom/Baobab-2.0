@@ -107,7 +107,7 @@ export default function EditProfileForm({
         <div className="flex gap-2 flex-wrap">
           {LOOKING_FOR.map((opt) => (
             <button type="button" key={opt} onClick={() => setEditForm({ ...editForm, lookingFor: opt })}
-              className={`bb-pill text-xs font-semibold px-3 py-2 rounded-full ${editForm.lookingFor === opt ? "bb-pill-active" : ""}`}>
+              className={`bb-pill text-xs font-semibold px-3.5 py-2.5 rounded-full ${editForm.lookingFor === opt ? "bb-pill-active" : ""}`}>
               {opt}
             </button>
           ))}
@@ -123,7 +123,7 @@ export default function EditProfileForm({
           <div className="flex gap-2 flex-wrap">
             {EDUCATION_LEVELS.map((opt) => (
               <button type="button" key={opt} onClick={() => setEditForm({ ...editForm, educationLevel: opt })}
-                className={`bb-pill text-xs font-semibold px-3 py-2 rounded-full ${editForm.educationLevel === opt ? "bb-pill-active" : ""}`}>
+                className={`bb-pill text-xs font-semibold px-3.5 py-2.5 rounded-full ${editForm.educationLevel === opt ? "bb-pill-active" : ""}`}>
                 {opt}
               </button>
             ))}
@@ -135,7 +135,7 @@ export default function EditProfileForm({
           <div className="flex gap-2">
             {HAS_CHILDREN_OPTIONS.map((opt) => (
               <button type="button" key={opt} onClick={() => setEditForm({ ...editForm, hasChildren: opt })}
-                className={`bb-pill text-xs font-semibold px-3 py-2 rounded-full ${editForm.hasChildren === opt ? "bb-pill-active" : ""}`}>
+                className={`bb-pill text-xs font-semibold px-3.5 py-2.5 rounded-full ${editForm.hasChildren === opt ? "bb-pill-active" : ""}`}>
                 {opt}
               </button>
             ))}
