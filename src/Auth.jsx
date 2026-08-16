@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { Loader2, Eye, EyeOff, Mail, Lock, ArrowLeft, MapPin } from "lucide-react";
+import { Loader2, Eye, EyeOff, Mail, Lock, ArrowLeft, MapPin, X, ShieldCheck, FileText, Info } from "lucide-react";
 import { supabase } from "./supabaseClient";
-import loginBackground from "./assets/baobab-canada-bg.png";
+import loginBackground from "./assets/baobab-canada-bg.svg";
+import { PrivacyPolicyContent, TermsOfServiceContent } from "./legalContent";
 
 const C = {
   dusk: "#0F1526",
@@ -33,6 +34,7 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [legalView, setLegalView] = useState(null); // "privacy" | "terms" | null
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -105,24 +107,31 @@ export default function Auth() {
 
   return (
     <main className="bb-auth min-h-screen relative flex items-center justify-center overflow-hidden px-4 py-6 sm:px-6"
-      style={{ fontFamily: "Inter, system-ui, sans-serif", color: C.sand, background: C.dusk }}>
+      style={{ fontFamily: "Inter, system-ui, sans-serif", color: C.sand, background: C.dusk,
+        paddingTop: "max(1.5rem, env(safe-area-inset-top))", paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}>
       <style>{`
-        @keyframes bbKenBurns { from { transform: scale(1.02); } to { transform: scale(1.09); } }
+        @keyframes bbKenBurns { from { transform: scale(1.04); } to { transform: scale(1.12); } }
         @keyframes bbRise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes bbWord { from { opacity: 0; transform: translateY(28px) rotateX(55deg); filter: blur(5px); } to { opacity: 1; transform: translateY(0) rotateX(0); filter: blur(0); } }
+        @keyframes bbWord { from { opacity: 0; transform: translateY(34px) rotateX(60deg) scale(.94); filter: blur(6px); } 60% { filter: blur(0); } to { opacity: 1; transform: translateY(0) rotateX(0) scale(1); filter: blur(0); } }
+        @keyframes bbGradientMove { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
         @keyframes bbGlow { 0%,100% { box-shadow: 0 0 0 0 rgba(217,164,65,.12); } 50% { box-shadow: 0 0 0 14px rgba(217,164,65,0); } }
         @keyframes bbFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
         @keyframes bbShimmer { 0% { transform: translateX(-120%); } 100% { transform: translateX(220%); } }
-        .bb-auth .bb-bg { animation: bbKenBurns 18s ease-in-out alternate infinite; }
+        @keyframes bbCaret { 0%,45% { opacity: 1; } 50%,95% { opacity: 0; } 100% { opacity: 1; } }
+        .bb-auth .bb-bg { animation: bbKenBurns 22s ease-in-out alternate infinite; }
         .bb-auth .bb-hero { animation: bbRise .8s cubic-bezier(.22,1,.36,1) both; }
         .bb-auth .bb-card { animation: bbRise .9s .12s cubic-bezier(.22,1,.36,1) both; }
-        .bb-auth .bb-word { display:inline-block; opacity:0; animation: bbWord .7s cubic-bezier(.22,1,.36,1) both; transform-origin: 50% 100%; }
+        .bb-auth .bb-word { display:inline-block; opacity:0; animation: bbWord .75s cubic-bezier(.22,1,.36,1) both; transform-origin: 50% 100%; }
+        .bb-auth .bb-word-gradient { background: linear-gradient(90deg, ${C.ochre}, #F0C878, ${C.ochre}); background-size: 200% auto; -webkit-background-clip: text; background-clip: text; color: transparent; animation: bbWord .75s cubic-bezier(.22,1,.36,1) both, bbGradientMove 4s ease-in-out .9s infinite; }
+        .bb-auth .bb-caret { display:inline-block; width: 2px; margin-left: 2px; animation: bbCaret 1.1s step-end infinite; }
         .bb-auth .bb-badge { animation: bbFloat 5s ease-in-out infinite; }
         .bb-auth .bb-brand-icon { animation: bbGlow 3s ease-in-out infinite; }
         .bb-auth .bb-submit { position:relative; overflow:hidden; }
         .bb-auth .bb-submit::after { content:""; position:absolute; inset:0 auto 0 -40%; width:35%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.28),transparent); transform:skewX(-18deg); animation:bbShimmer 3.8s ease-in-out infinite; }
         .bb-auth .bb-field { transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease, background .25s ease; }
         .bb-auth .bb-field:focus-within { transform: translateY(-1px); border-color: rgba(217,164,65,.55) !important; box-shadow: 0 10px 30px rgba(0,0,0,.16), 0 0 0 3px rgba(217,164,65,.08); background: rgba(35,45,82,.92) !important; }
+        .bb-auth input { font-size: 16px; }
+        .bb-auth .bb-tap { min-height: 44px; }
         @media (prefers-reduced-motion: reduce) { .bb-auth * { animation: none !important; transition: none !important; } }
       `}</style>
 
@@ -143,7 +152,7 @@ export default function Auth() {
           </div>
           <h2 className="mt-5 text-4xl lg:text-6xl font-bold leading-[1.05]" style={{ fontFamily: "Fraunces, serif", perspective: "700px" }}>
             <span className="bb-word" style={{ animationDelay: ".12s" }}>Nouvelle</span> <span className="bb-word" style={{ animationDelay: ".2s" }}>vie.</span><br />
-            <span className="bb-word" style={{ color: C.ochre, animationDelay: ".34s" }}>Nouvelles</span> <span className="bb-word" style={{ color: C.ochre, animationDelay: ".42s" }}>connexions.</span>
+            <span className="bb-word bb-word-gradient" style={{ animationDelay: ".34s" }}>Nouvelles</span> <span className="bb-word bb-word-gradient" style={{ animationDelay: ".42s" }}>connexions.</span><span className="bb-caret" style={{ height: "0.85em", background: C.ochre, verticalAlign: "-0.1em" }} />
           </h2>
           <p className="mt-5 max-w-md text-base lg:text-lg leading-7" style={{ color: C.sandDim }}>
             Baobab rapproche les immigrants au Canada pour l'amour, l'amitié, les rencontres et les nouvelles communautés.
@@ -185,8 +194,8 @@ export default function Auth() {
                 style={{ background: "rgba(35,45,82,0.78)", border: "1px solid rgba(242,233,220,0.11)" }}>
                 <Mail size={17} color={C.sandDim} />
                 <input id="email" type="email" placeholder="exemple@email.com" value={email}
-                  onChange={(e) => setEmail(e.target.value)} required autoComplete="email"
-                  className="min-w-0 flex-1 bg-transparent py-3.5 text-sm outline-none" style={{ color: C.sand }} />
+                  onChange={(e) => setEmail(e.target.value)} required autoComplete="email" inputMode="email"
+                  className="min-w-0 flex-1 bg-transparent py-4 text-sm outline-none" style={{ color: C.sand }} />
               </div>
             </div>
 
@@ -201,16 +210,16 @@ export default function Auth() {
                 <input id="password" type={showPassword ? "text" : "password"} placeholder="••••••••" value={password}
                   onChange={(e) => setPassword(e.target.value)} required minLength={6}
                   autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                  className="min-w-0 flex-1 bg-transparent py-3.5 text-sm outline-none" style={{ color: C.sand }} />
+                  className="min-w-0 flex-1 bg-transparent py-4 text-sm outline-none" style={{ color: C.sand }} />
                 <button type="button" aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
-                  onClick={() => setShowPassword((v) => !v)} style={{ color: C.sandDim }}>
+                  onClick={() => setShowPassword((v) => !v)} className="bb-tap flex items-center justify-center" style={{ color: C.sandDim, width: 32 }}>
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </div>}
 
             <button type="submit" disabled={loading}
-              className="bb-submit mt-1 flex items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-bold transition-transform duration-200 hover:scale-[1.01] disabled:opacity-60"
+              className="bb-submit bb-tap mt-1 flex items-center justify-center gap-2 rounded-2xl py-4 text-sm font-bold transition-transform duration-200 active:scale-[0.98] hover:scale-[1.01] disabled:opacity-60"
               style={{ background: `linear-gradient(135deg, ${C.clay}, #A94F30)`, color: "#FFF8EF", boxShadow: "0 14px 32px -10px rgba(193,97,61,.65)" }}>
               {loading && <Loader2 size={17} className="animate-spin" />}
               {mode === "signup" ? "Créer mon compte" : mode === "reset" ? "Envoyer le lien" : "Se connecter"}
@@ -219,20 +228,42 @@ export default function Auth() {
 
           <div className="mt-6 text-center text-xs" style={{ color: C.sandDim }}>
             {mode === "signin" && <span>Pas encore de compte ?{" "}
-              <button onClick={() => switchMode("signup")} className="font-bold" style={{ color: C.ochre }}>Inscris-toi</button>
+              <button onClick={() => switchMode("signup")} className="bb-tap font-bold" style={{ color: C.ochre }}>Inscris-toi</button>
             </span>}
-            {mode !== "signin" && <button onClick={() => switchMode("signin")} className="inline-flex items-center gap-1 font-semibold" style={{ color: C.ochre }}>
+            {mode !== "signin" && <button onClick={() => switchMode("signin")} className="bb-tap inline-flex items-center gap-1 font-semibold" style={{ color: C.ochre }}>
               <ArrowLeft size={14} /> Retour à la connexion
             </button>}
           </div>
 
           <div className="mt-7 border-t pt-5 text-center text-[10px]"
             style={{ borderColor: "rgba(242,233,220,0.10)", color: "rgba(242,233,220,0.42)" }}>
-            <div className="flex justify-center gap-4"><button type="button">Confidentialité</button><span>•</span><button type="button">Conditions</button><span>•</span><button type="button">À propos</button></div>
+            <div className="flex justify-center flex-wrap gap-x-4 gap-y-2">
+              <button type="button" onClick={() => setLegalView("privacy")} className="bb-tap underline decoration-dotted underline-offset-2">Confidentialité</button>
+              <span>•</span>
+              <button type="button" onClick={() => setLegalView("terms")} className="bb-tap underline decoration-dotted underline-offset-2">Conditions</button>
+            </div>
             <div className="mt-3" style={{ fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.08em" }}>BAOBAB — BY LESSI PATRICK</div>
           </div>
         </div>
       </section>
+
+      {legalView && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6" style={{ background: "rgba(8,13,30,0.72)" }}>
+          <div className="w-full sm:max-w-lg max-h-[88vh] sm:max-h-[80vh] flex flex-col rounded-t-[28px] sm:rounded-[24px] overflow-hidden"
+            style={{ background: C.dusk3, color: C.sand, paddingBottom: "env(safe-area-inset-bottom)" }}>
+            <div className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0" style={{ borderColor: "rgba(242,233,220,0.12)" }}>
+              <div className="flex items-center gap-2 font-bold text-sm">
+                {legalView === "privacy" ? <ShieldCheck size={16} color={C.ochre} /> : <FileText size={16} color={C.ochre} />}
+                {legalView === "privacy" ? "Politique de confidentialité" : "Conditions d'utilisation"}
+              </div>
+              <button onClick={() => setLegalView(null)} className="bb-tap h-9 w-9 flex items-center justify-center rounded-full" style={{ background: "rgba(242,233,220,0.1)" }}><X size={16} /></button>
+            </div>
+            <div className="overflow-y-auto px-5 py-4 text-xs leading-6" style={{ color: C.sandDim }}>
+              {legalView === "privacy" ? <PrivacyPolicyContent /> : <TermsOfServiceContent />}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

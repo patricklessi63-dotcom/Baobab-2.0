@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Home, Heart, X, MessageCircle, LogOut, ArrowLeft, Send, Loader2, Sparkles, MoreVertical, Flag, Ban, Settings, Shield, Info, Moon, Image as ImageIcon, CheckCheck, Circle, UserRound, Camera, Menu, Search, Bell } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import Auth from "./Auth.jsx";
-import appBackground from "./assets/baobab-canada-bg.png";
+import { PrivacyPolicyContent, TermsOfServiceContent } from "./legalContent";
 
 // ---------- Palette "Baobab" ----------
 const C = {
@@ -344,8 +344,7 @@ function SocialShell({
         .bb-glass { background: rgba(255,255,255,.78) !important; backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
         @media (prefers-reduced-motion: reduce) { .bb-app * { animation: none !important; transition: none !important; } }
       `}</style>
-      <div aria-hidden="true" className="bb-app-bg fixed inset-0 z-0 pointer-events-none bg-cover bg-center" style={{ backgroundImage: `url(${appBackground})` }} />
-      <div aria-hidden="true" className="fixed inset-0 z-0 pointer-events-none" style={{ background: "linear-gradient(180deg, rgba(242,233,220,.42), rgba(245,246,250,.88) 42%, rgba(245,246,250,.96) 100%)" }} />
+      <div aria-hidden="true" className="fixed inset-0 z-0 pointer-events-none" style={{ background: "#F7F8FA" }} />
       <header className="sticky top-0 z-40 border-b bb-glass" style={{ borderColor: "rgba(21,27,61,.08)" }}>
         <div className="max-w-7xl mx-auto px-4 lg:px-8 h-[74px] flex items-center gap-4">
           <button onClick={() => goTab("feed")} className="flex items-center gap-3 shrink-0">
@@ -627,10 +626,11 @@ function SocialShell({
                   return (
                     <div
                       className="bb-swipe-card absolute inset-0 bg-white rounded-[34px] overflow-hidden border shadow-[0_24px_80px_rgba(21,27,61,.18)] cursor-grab active:cursor-grabbing"
-                      style={{ transform, opacity: isExiting ? 0.4 : 1, transition: swiping ? "none" : "transform .35s cubic-bezier(.22,1,.36,1), opacity .35s" }}
-                      onPointerDown={(e) => onSwipeStart(e.clientX)}
+                      style={{ transform, opacity: isExiting ? 0.4 : 1, transition: swiping ? "none" : "transform .35s cubic-bezier(.22,1,.36,1), opacity .35s", touchAction: "pan-y" }}
+                      onPointerDown={(e) => { e.currentTarget.setPointerCapture?.(e.pointerId); onSwipeStart(e.clientX); }}
                       onPointerMove={(e) => onSwipeMove(e.clientX)}
                       onPointerUp={onSwipeEnd}
+                      onPointerCancel={onSwipeEnd}
                       onPointerLeave={() => swiping && onSwipeEnd()}
                     >
                       <div className="h-[500px] relative overflow-hidden" style={{ background: photo ? `linear-gradient(180deg,rgba(21,27,61,.05) 35%,rgba(21,27,61,.88)),url(${photo}) center/cover` : `linear-gradient(145deg,${primary},${green},${gold})` }}>
@@ -647,8 +647,8 @@ function SocialShell({
                         )}
                         {photos.length > 1 && (
                           <>
-                            <button onClick={() => setDiscoverPhotoIndex((i) => Math.max(0, i - 1))} className="absolute left-0 top-0 bottom-24 w-1/3 z-[5]" aria-label="Photo précédente" />
-                            <button onClick={() => setDiscoverPhotoIndex((i) => Math.min(photos.length - 1, i + 1))} className="absolute right-0 top-0 bottom-24 w-1/3 z-[5]" aria-label="Photo suivante" />
+                            <button onPointerDown={(e) => e.stopPropagation()} onClick={() => setDiscoverPhotoIndex((i) => Math.max(0, i - 1))} className="absolute left-0 top-0 bottom-24 w-1/3 z-[5]" aria-label="Photo précédente" />
+                            <button onPointerDown={(e) => e.stopPropagation()} onClick={() => setDiscoverPhotoIndex((i) => Math.min(photos.length - 1, i + 1))} className="absolute right-0 top-0 bottom-24 w-1/3 z-[5]" aria-label="Photo suivante" />
                           </>
                         )}
 
@@ -678,8 +678,8 @@ function SocialShell({
                       <div className="p-5 md:p-6">
                         {p.interests && <div className="mb-4"><div className="text-[11px] font-black uppercase tracking-wider" style={{ color: muted }}>Centres d'intérêt</div><div className="text-sm mt-1">{p.interests}</div></div>}
                         <div className="flex items-center justify-center gap-5">
-                          <button onClick={() => decideSwipe("pass")} className={`${buttonBase} h-16 w-16 rounded-full border-2 flex items-center justify-center bg-white`} style={{ borderColor: "#E5E7EF" }}><X size={28} color={muted} /></button>
-                          <button onClick={() => decideSwipe("like")} className={`${buttonBase} h-[72px] w-[72px] rounded-full text-white flex items-center justify-center shadow-xl`} style={{ background: `linear-gradient(135deg,${coral},#D94F70)` }}><Heart size={30} fill="white" /></button>
+                          <button onPointerDown={(e) => e.stopPropagation()} onClick={() => decideSwipe("pass")} className={`${buttonBase} h-16 w-16 rounded-full border-2 flex items-center justify-center bg-white`} style={{ borderColor: "#E5E7EF" }}><X size={28} color={muted} /></button>
+                          <button onPointerDown={(e) => e.stopPropagation()} onClick={() => decideSwipe("like")} className={`${buttonBase} h-[72px] w-[72px] rounded-full text-white flex items-center justify-center shadow-xl`} style={{ background: `linear-gradient(135deg,${coral},#D94F70)` }}><Heart size={30} fill="white" /></button>
                         </div>
                         <div className="text-center text-[11px] mt-3" style={{ color: muted }}>♥ Oui si tu veux faire connaissance · × Passer</div>
                       </div>
@@ -859,10 +859,10 @@ function SocialShell({
       </main>
 
 
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bb-glass border-t" style={{ borderColor: "rgba(21,27,61,.08)" }}>
+      <nav className="fixed bottom-0 left-0 right-0 z-40 bb-glass border-t" style={{ borderColor: "rgba(21,27,61,.08)", paddingBottom: "env(safe-area-inset-bottom)" }}>
         <div className="max-w-xl mx-auto grid grid-cols-5 px-2">
           {nav.map(([key, Icon, label]) => (
-            <button key={key} onClick={() => goTab(key)} className="py-3 flex flex-col items-center gap-1.5 rounded-2xl">
+            <button key={key} onClick={() => goTab(key)} className="py-3 flex flex-col items-center gap-1.5 rounded-2xl" style={{ minHeight: 48 }}>
               <div className="h-7 w-9 flex items-center justify-center rounded-xl" style={{ background: tab === key ? "rgba(225,107,93,.11)" : "transparent" }}>
                 <Icon size={19} color={tab === key ? coral : muted} fill={tab === key && key === "discover" ? coral : "none"} />
               </div>
@@ -991,6 +991,7 @@ export default function App() {
   const [showMenu, setShowMenu] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
+  const [termsOpen, setTermsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [coverFile, setCoverFile] = useState(null);
   const [coverPreview, setCoverPreview] = useState("");
@@ -1166,7 +1167,7 @@ export default function App() {
       setMenuOpenFor(null);
       if (activeMatch?.id === target.id) {
         setActiveMatch(null);
-        setView("matches");
+        setView("feed");
       }
     } catch (e) {
       console.error(e);
@@ -1588,7 +1589,7 @@ export default function App() {
     return <Auth />;
   }
 
-  if (currentUser && ["feed", "stories", "profile"].includes(view)) {
+  if (currentUser && ["feed", "stories", "profile", "discover", "matches"].includes(view)) {
     return <SocialShell currentUser={currentUser} setView={setView} handleSignOut={handleSignOut} candidates={candidates} getMatches={getMatches} openChat={openChat} handleLike={handleLike} handlePass={handlePass} profilePhotos={profilePhotos} openEditProfile={openEditProfile} />;
   }
 
@@ -1600,8 +1601,7 @@ export default function App() {
         .bb-generic-glass { background: rgba(255,255,255,.82) !important; backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
         @media (prefers-reduced-motion: reduce) { .bb-app * { animation: none !important; transition: none !important; } }
       `}</style>
-      <div aria-hidden="true" className="bb-generic-bg fixed inset-0 z-0 pointer-events-none bg-cover bg-center" style={{ backgroundImage: `url(${appBackground})` }} />
-      <div aria-hidden="true" className="fixed inset-0 z-0 pointer-events-none" style={{ background: "linear-gradient(180deg, rgba(242,233,220,.44), rgba(242,233,220,.88) 36%, rgba(242,233,220,.97) 100%)" }} />
+      <div aria-hidden="true" className="fixed inset-0 z-0 pointer-events-none" style={{ background: "#F7F8FA" }} />
       {/* Header */}
       <div className="relative z-20 flex items-center justify-between px-5 py-4 bb-generic-glass" style={{ borderBottom: `1px solid rgba(43,36,32,0.08)`, boxShadow: "0 1px 0 rgba(20,29,56,0.02)", position: "sticky", top: 0, zIndex: 10 }}>
         <div className="flex items-center gap-2">
@@ -2056,7 +2056,7 @@ export default function App() {
         {view === "chat" && activeMatch && (
           <div className="flex flex-col flex-1 max-w-md mx-auto w-full">
             <div className="flex items-center gap-3 p-4" style={{ borderBottom: "1px solid rgba(43,36,32,0.1)", position: "relative" }}>
-              <button onClick={() => setView("matches")}><ArrowLeft size={18} /></button>
+              <button onClick={() => setView("feed")}><ArrowLeft size={18} /></button>
               <div style={{ position: "relative" }}>
                 <Avatar name={activeMatch.name} url={activeMatch.avatar_url} size={34} />
                 <Circle
@@ -2144,16 +2144,16 @@ export default function App() {
               </div>
             )}
 
-            <div className="p-4 flex gap-2" style={{ borderTop: "1px solid rgba(43,36,32,0.08)" }}>
+            <div className="p-4 flex gap-2" style={{ borderTop: "1px solid rgba(43,36,32,0.08)", paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
               <input
                 value={messageDraft}
                 onChange={(e) => { setMessageDraft(e.target.value); broadcastTyping(); }}
                 onKeyDown={(e) => e.key === "Enter" && sendMessage()}
                 placeholder="Écris un message..."
                 className="bb-input flex-1 text-sm"
-                style={{ borderRadius: 999 }}
+                style={{ borderRadius: 999, fontSize: 16, minHeight: 44 }}
               />
-              <button onClick={sendMessage} className="bb-btn bb-btn-heart w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0">
+              <button onClick={sendMessage} className="bb-btn bb-btn-heart w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ minWidth: 44, minHeight: 44 }}>
                 <Send size={16} />
               </button>
             </div>
@@ -2219,7 +2219,15 @@ export default function App() {
               <div className="flex items-center gap-2 text-sm"><Moon size={14} color={C.indigo} /> Mode sombre</div>
               <span className="text-xs" style={{ color: "rgba(43,36,32,0.4)" }}>Bientôt</span>
             </div>
-            <button onClick={() => setSettingsOpen(false)} className="w-full mt-4 py-2.5 rounded-full text-sm font-semibold" style={{ border: "1px solid rgba(43,36,32,0.15)", color: C.ink }}>
+            <button onClick={() => { setSettingsOpen(false); setPrivacyOpen(true); }} className="w-full flex items-center justify-between py-3" style={{ borderTop: "1px solid rgba(43,36,32,0.08)", minHeight: 44 }}>
+              <span className="flex items-center gap-2 text-sm"><Shield size={14} color={C.indigo} /> Politique de confidentialité</span>
+              <ArrowLeft size={14} style={{ transform: "rotate(180deg)", color: "rgba(43,36,32,0.35)" }} />
+            </button>
+            <button onClick={() => { setSettingsOpen(false); setTermsOpen(true); }} className="w-full flex items-center justify-between py-3" style={{ borderTop: "1px solid rgba(43,36,32,0.08)", minHeight: 44 }}>
+              <span className="flex items-center gap-2 text-sm"><Info size={14} color={C.indigo} /> Conditions d'utilisation</span>
+              <ArrowLeft size={14} style={{ transform: "rotate(180deg)", color: "rgba(43,36,32,0.35)" }} />
+            </button>
+            <button onClick={() => setSettingsOpen(false)} className="w-full mt-4 py-3 rounded-full text-sm font-semibold" style={{ border: "1px solid rgba(43,36,32,0.15)", color: C.ink, minHeight: 44 }}>
               Fermer
             </button>
           </div>
@@ -2229,23 +2237,31 @@ export default function App() {
       {/* ---------- MODAL POLITIQUE DE CONFIDENTIALITÉ ---------- */}
       {privacyOpen && (
         <div className="bb-fade-in fixed inset-0 flex items-end justify-center z-30" style={{ background: "rgba(20,29,56,0.55)", backdropFilter: "blur(3px)" }} onClick={() => setPrivacyOpen(false)}>
-          <div className="bb-card p-6 w-full max-w-md" style={{ borderRadius: "20px 20px 0 0", maxHeight: "75vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+          <div className="bb-card p-6 w-full max-w-md" style={{ borderRadius: "20px 20px 0 0", maxHeight: "80vh", overflowY: "auto", paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }} onClick={(e) => e.stopPropagation()}>
             <div style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 20, color: C.indigo }} className="mb-3">
               Politique de confidentialité
             </div>
-            <p className="text-sm mb-2.5" style={{ color: "rgba(43,36,32,0.65)" }}>
-              <b style={{ color: C.ink }}>Ce que nous gardons.</b> Ton profil, tes photos, tes likes/passes et tes messages sont stockés de façon sécurisée pour faire fonctionner Baobab.
-            </p>
-            <p className="text-sm mb-2.5" style={{ color: "rgba(43,36,32,0.65)" }}>
-              <b style={{ color: C.ink }}>Statut en ligne.</b> Les autres membres peuvent voir si tu es en ligne et quand tu écris. Tu peux le désactiver dans Paramètres.
-            </p>
-            <p className="text-sm mb-2.5" style={{ color: "rgba(43,36,32,0.65)" }}>
-              <b style={{ color: C.ink }}>Signalement &amp; blocage.</b> Les profils signalés sont examinés ; un profil bloqué ne peut plus te contacter ni apparaître dans ta liste de découverte.
-            </p>
-            <p className="text-sm mb-4" style={{ color: "rgba(43,36,32,0.65)" }}>
-              <b style={{ color: C.ink }}>Ce que nous ne faisons pas.</b> Baobab ne vend pas tes données à des tiers.
-            </p>
-            <button onClick={() => setPrivacyOpen(false)} className="w-full py-2.5 rounded-full text-sm font-semibold" style={{ border: "1px solid rgba(43,36,32,0.15)", color: C.ink }}>
+            <div className="text-sm" style={{ color: "rgba(43,36,32,0.72)" }}>
+              <PrivacyPolicyContent />
+            </div>
+            <button onClick={() => setPrivacyOpen(false)} className="w-full py-3 mt-2 rounded-full text-sm font-semibold" style={{ border: "1px solid rgba(43,36,32,0.15)", color: C.ink, minHeight: 44 }}>
+              Fermer
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ---------- MODAL CONDITIONS D'UTILISATION ---------- */}
+      {termsOpen && (
+        <div className="bb-fade-in fixed inset-0 flex items-end justify-center z-30" style={{ background: "rgba(20,29,56,0.55)", backdropFilter: "blur(3px)" }} onClick={() => setTermsOpen(false)}>
+          <div className="bb-card p-6 w-full max-w-md" style={{ borderRadius: "20px 20px 0 0", maxHeight: "80vh", overflowY: "auto", paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 20, color: C.indigo }} className="mb-3">
+              Conditions d'utilisation
+            </div>
+            <div className="text-sm" style={{ color: "rgba(43,36,32,0.72)" }}>
+              <TermsOfServiceContent />
+            </div>
+            <button onClick={() => setTermsOpen(false)} className="w-full py-3 mt-2 rounded-full text-sm font-semibold" style={{ border: "1px solid rgba(43,36,32,0.15)", color: C.ink, minHeight: 44 }}>
               Fermer
             </button>
           </div>
