@@ -69,7 +69,7 @@ export default function UpdatePasswordScreen({ onDone }) {
                 className="flex-1 min-w-0 bg-transparent py-3.5 text-sm outline-none"
                 style={{ fontSize: 16 }}
               />
-              <button type="button" onClick={() => setShowPassword((v) => !v)} className="flex items-center justify-center flex-shrink-0" style={{ width: 32, color: "rgba(43,36,32,0.4)" }}>
+              <button type="button" aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"} onClick={() => setShowPassword((v) => !v)} className="flex items-center justify-center flex-shrink-0" style={{ width: 44, height: 44, color: "rgba(43,36,32,0.4)" }}>
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
