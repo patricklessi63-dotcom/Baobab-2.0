@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Home, Heart, X, MessageCircle, LogOut, Send, Sparkles, MoreVertical, Settings, Image as ImageIcon, CheckCheck, UserRound, Camera, Search, Bell } from "lucide-react";
 import Avatar from "./Avatar";
+import { supabase } from "../supabaseClient";
+
+const STORY_COLORS = ["#E56B5D", "#2F8F6B", "#5667A9", "#F2B84B", "#C1613D", "#1E2A4F"];
+function colorForProfile(id) {
+  let hash = 0;
+  for (let i = 0; i < String(id).length; i++) hash = (hash * 31 + String(id).charCodeAt(i)) >>> 0;
+  return STORY_COLORS[hash % STORY_COLORS.length];
+}
 
 export default function SocialShell({
   currentUser,
@@ -36,18 +44,59 @@ export default function SocialShell({
   const [search, setSearch] = useState("");
   const [stories, setStories] = useState([
     { name: "Votre statut", initial: "+", own: true, color: "#151B3D" },
-    { name: "Sarah", initial: "S", color: "#E56B5D" },
-    { name: "Brenda", initial: "B", color: "#2F8F6B" },
-    { name: "David", initial: "D", color: "#5667A9" },
-    { name: "Mireille", initial: "M", color: "#F2B84B" },
   ]);
   const [storyComposer, setStoryComposer] = useState(false);
   const [storyText, setStoryText] = useState("");
+  const [storyMedia, setStoryMedia] = useState(null);
+  const [storyMediaKind, setStoryMediaKind] = useState("");
+  const [storyMediaError, setStoryMediaError] = useState("");
+  const [storyUploading, setStoryUploading] = useState(false);
   const [storyViewerIndex, setStoryViewerIndex] = useState(null);
   const [viewedStories, setViewedStories] = useState({});
   const [storyReply, setStoryReply] = useState("");
   const photoInputRef = useRef(null);
   const videoInputRef = useRef(null);
+  const storyPhotoInputRef = useRef(null);
+  const storyVideoInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    let alive = true;
+    supabase
+      .from("stories")
+      .select("id, profile_id, text, media_url, media_kind, created_at, profile:profile_id(name, avatar_url)")
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (!alive) return;
+        if (error) { console.error(error); return; }
+        const seen = new Set();
+        const latestPerProfile = [];
+        for (const row of data || []) {
+          if (seen.has(row.profile_id)) continue;
+          seen.add(row.profile_id);
+          latestPerProfile.push(row);
+        }
+        const ownIdx = latestPerProfile.findIndex((s) => s.profile_id === currentUser.id);
+        const ownRow = ownIdx >= 0 ? latestPerProfile.splice(ownIdx, 1)[0] : null;
+        const toEntry = (row, isOwn) => {
+          const name = isOwn ? "Votre statut" : (row.profile?.name || "?");
+          const profileId = isOwn ? currentUser.id : row.profile_id;
+          return {
+            id: row?.id,
+            profile_id: profileId,
+            own: isOwn,
+            name,
+            initial: (isOwn ? (currentUser.name || "?") : name).trim().charAt(0).toUpperCase(),
+            color: colorForProfile(profileId),
+            text: row?.text || "",
+            media_url: row?.media_url || null,
+            media_kind: row?.media_kind || null,
+          };
+        };
+        setStories([toEntry(ownRow, true), ...latestPerProfile.map((r) => toEntry(r, false))]);
+      });
+    return () => { alive = false; };
+  }, [currentUser]);
 
   const [swipeX, setSwipeX] = useState(0);
   const [swiping, setSwiping] = useState(false);
@@ -169,14 +218,74 @@ export default function SocialShell({
     } catch (_) {}
   };
 
-  const addStory = () => {
-    if (!storyText.trim()) return;
-    setStories((prev) => [
-      { name: "Votre statut", initial: "+", own: true, color: primary, text: storyText.trim() },
-      ...prev.filter((s) => !s.own),
-    ]);
-    setStoryText("");
-    setStoryComposer(false);
+  const pickStoryMedia = (kind) => {
+    if (kind === "photo") storyPhotoInputRef.current?.click();
+    else storyVideoInputRef.current?.click();
+  };
+
+  const onStoryMediaSelected = (e, kind) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (kind === "video" && file.size > 25 * 1024 * 1024) {
+      setStoryMediaError("Vidéo trop volumineuse (25 Mo max).");
+      e.target.value = "";
+      return;
+    }
+    setStoryMediaError("");
+    setStoryMedia(file);
+    setStoryMediaKind(kind);
+    e.target.value = "";
+  };
+
+  const uploadStoryMedia = async (profileId, file) => {
+    const ext = file.name.split(".").pop();
+    const path = `${profileId}/story-${Date.now()}.${ext}`;
+    const { error: uploadError } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+    if (uploadError) throw uploadError;
+    const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+    return data.publicUrl;
+  };
+
+  const addStory = async () => {
+    const text = storyText.trim();
+    if (!text && !storyMedia) return;
+    if (!currentUser) return;
+    setStoryUploading(true);
+    try {
+      let mediaUrl = null;
+      const mediaKind = storyMedia ? storyMediaKind : null;
+      if (storyMedia) mediaUrl = await uploadStoryMedia(currentUser.id, storyMedia);
+      const { data, error } = await supabase
+        .from("stories")
+        .insert({ profile_id: currentUser.id, text: text || null, media_url: mediaUrl, media_kind: mediaKind })
+        .select()
+        .single();
+      if (error) throw error;
+      setStories((prev) => [
+        {
+          id: data.id,
+          profile_id: currentUser.id,
+          own: true,
+          name: "Votre statut",
+          initial: (currentUser.name || "?").trim().charAt(0).toUpperCase(),
+          color: colorForProfile(currentUser.id),
+          text,
+          media_url: mediaUrl,
+          media_kind: mediaKind,
+        },
+        ...prev.filter((s) => !s.own),
+      ]);
+      setStoryText("");
+      setStoryMedia(null);
+      setStoryMediaKind("");
+      setStoryMediaError("");
+      setStoryComposer(false);
+    } catch (e) {
+      console.error(e);
+      setStoryMediaError("Impossible de publier le statut. Réessaie.");
+    } finally {
+      setStoryUploading(false);
+    }
   };
 
   const openStory = (index) => {
@@ -840,12 +949,23 @@ export default function SocialShell({
             <button onClick={prevStory} className="absolute left-0 top-0 bottom-0 w-1/3 z-[5]" aria-label="Précédent" />
             <button onClick={nextStory} className="absolute right-0 top-0 bottom-0 w-1/3 z-[5]" aria-label="Suivant" />
 
-            <div className="absolute inset-0 flex items-center justify-center px-10 text-center z-[2]">
-              {stories[storyViewerIndex].text ? (
-                <p className="text-white text-2xl font-bold leading-snug">{stories[storyViewerIndex].text}</p>
+            {stories[storyViewerIndex].media_url && (
+              stories[storyViewerIndex].media_kind === "video" ? (
+                <video src={stories[storyViewerIndex].media_url} autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover z-[1]" />
               ) : (
+                <img src={stories[storyViewerIndex].media_url} alt="" className="absolute inset-0 w-full h-full object-cover z-[1]" />
+              )
+            )}
+
+            <div
+              className={`absolute inset-0 flex px-10 text-center z-[2] ${stories[storyViewerIndex].media_url ? "items-end pb-24" : "items-center"}`}
+              style={stories[storyViewerIndex].media_url ? { background: "linear-gradient(180deg,transparent 45%,rgba(0,0,0,.6))" } : undefined}
+            >
+              {stories[storyViewerIndex].text ? (
+                <p className="text-white text-xl font-bold leading-snug">{stories[storyViewerIndex].text}</p>
+              ) : !stories[storyViewerIndex].media_url ? (
                 <div className="text-white/70 text-sm">Moment partagé par {stories[storyViewerIndex].name}</div>
-              )}
+              ) : null}
             </div>
 
             <div className="absolute bottom-0 left-0 right-0 p-4 flex gap-2 z-10" style={{ background: "linear-gradient(180deg,transparent,rgba(0,0,0,.35))" }}>
@@ -864,12 +984,34 @@ export default function SocialShell({
         </div>
       )}
 
+      <input ref={storyPhotoInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => onStoryMediaSelected(e, "photo")} />
+      <input ref={storyVideoInputRef} type="file" accept="video/*" className="hidden" onChange={(e) => onStoryMediaSelected(e, "video")} />
+
       {storyComposer && (
         <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center p-0 md:p-5" style={{ background: "rgba(21,27,61,.55)", backdropFilter: "blur(5px)" }} onClick={() => setStoryComposer(false)}>
           <div className="bg-white w-full max-w-md rounded-t-[30px] md:rounded-[30px] p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between"><h2 className="text-xl font-black" style={{ color: primary }}>Nouveau statut</h2><button onClick={() => setStoryComposer(false)}><X /></button></div>
             <textarea autoFocus value={storyText} onChange={(e) => setStoryText(e.target.value)} className="mt-5 w-full min-h-28 rounded-2xl p-4 outline-none resize-none" style={{ background: bg }} placeholder="Une pensée, une bonne nouvelle, un moment de ta journée…" />
-            <button onClick={addStory} disabled={!storyText.trim()} className="w-full mt-4 rounded-xl py-3 text-white font-bold disabled:opacity-40" style={{ background: coral }}>Partager le statut</button>
+            {storyMedia && (
+              <div className="mt-3 rounded-2xl overflow-hidden bg-black max-h-56 relative">
+                {storyMediaKind === "video" ? (
+                  <video src={URL.createObjectURL(storyMedia)} controls className="w-full max-h-56 object-contain" />
+                ) : (
+                  <img src={URL.createObjectURL(storyMedia)} alt="" className="w-full max-h-56 object-contain" />
+                )}
+                <button onClick={() => { setStoryMedia(null); setStoryMediaKind(""); }} className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center">
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+            {storyMediaError && <p className="text-xs mt-2" style={{ color: coral }}>{storyMediaError}</p>}
+            <div className="grid grid-cols-2 gap-2 mt-3">
+              <button onClick={() => pickStoryMedia("photo")} className="rounded-xl py-3 font-bold" style={{ background: "#FFF3F1", color: coral }}><ImageIcon size={17} className="inline mr-1" />Photo</button>
+              <button onClick={() => pickStoryMedia("video")} className="rounded-xl py-3 font-bold" style={{ background: "#EEF8F4", color: green }}><Camera size={17} className="inline mr-1" />Vidéo</button>
+            </div>
+            <button onClick={addStory} disabled={(!storyText.trim() && !storyMedia) || storyUploading} className="w-full mt-4 rounded-xl py-3 text-white font-bold disabled:opacity-40" style={{ background: coral }}>
+              {storyUploading ? "Publication..." : "Partager le statut"}
+            </button>
           </div>
         </div>
       )}
