@@ -7,6 +7,10 @@ import { C, LOOKING_FOR, EDUCATION_LEVELS, HAS_CHILDREN_OPTIONS, MAX_PHOTOS } fr
 import { matchKey, formatLastSeen, formatMessageTime, formatDayLabel } from "./utils/format";
 import Avatar from "./components/Avatar";
 import SocialShell from "./components/SocialShell";
+import AppModals from "./components/AppModals";
+import CreateProfileForm from "./screens/CreateProfileForm";
+import EditProfileForm from "./screens/EditProfileForm";
+import ChatScreen from "./screens/ChatScreen";
 
 export default function App() {
   const [session, setSession] = useState(undefined); // undefined = pas encore vérifié, null = pas connecté
@@ -609,12 +613,6 @@ export default function App() {
     });
   }
 
-  const iceBreakers = [
-    "Le plat de chez toi qui te manque le plus ?",
-    "Comment se passe ton adaptation ici ?",
-    "Qu'est-ce qui t'a le plus surpris en arrivant au Canada ?",
-  ];
-
   // ---------------- RENDER ----------------
 
   if (view === "loading" || view === "checking-profile" || session === undefined) {
@@ -721,612 +719,75 @@ export default function App() {
       <div className="relative z-10 flex-1 flex flex-col">
         {/* ---------- FORM (première connexion : pas encore de profil) ---------- */}
         {view === "form" && (
-          <div className="p-6 max-w-md mx-auto w-full">
-            <p className="text-sm mb-4" style={{ color: "rgba(43,36,32,0.65)" }}>
-              Bienvenue ! Crée ton profil pour commencer à découvrir d'autres membres.
-            </p>
-            <h2 style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 24, color: C.indigo }} className="mb-4">
-              Créer ton profil
-            </h2>
-            <form onSubmit={handleCreateProfile} className="flex flex-col gap-3">
-              <div className="mb-2">
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {photoPreviews.map((src, i) => (
-                    <div key={i} style={{ position: "relative" }}>
-                      <img src={src} alt={`Photo ${i + 1}`} style={{ width: 72, height: 72, borderRadius: "var(--bb-radius-sm)", objectFit: "cover", boxShadow: "var(--bb-shadow-sm)" }} />
-                      <button type="button" onClick={() => removePhotoFile(i)}
-                        style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: C.indigo, color: "#fff", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                  {photoPreviews.length < MAX_PHOTOS && (
-                    <label className="cursor-pointer flex items-center justify-center transition-colors hover:bg-black/[0.02]" style={{ width: 72, height: 72, borderRadius: "var(--bb-radius-sm)", border: "1.5px dashed rgba(43,36,32,0.28)" }}>
-                      <span className="text-xs text-center px-1" style={{ color: "rgba(43,36,32,0.5)" }}>+ Ajouter</span>
-                      <input type="file" accept="image/*" multiple onChange={handlePhotosSelected} className="hidden" />
-                    </label>
-                  )}
-                </div>
-                <p className="text-xs" style={{ color: "rgba(43,36,32,0.5)" }}>
-                  Jusqu'à {MAX_PHOTOS} photos. La première sera ta photo principale.
-                </p>
-              </div>
-              <input placeholder="Prénom" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="bb-input w-full text-sm" />
-              <input placeholder="Âge" type="number" value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })}
-                className="bb-input w-full text-sm" />
-              <input placeholder="Pays d'origine" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })}
-                className="bb-input w-full text-sm" />
-              <input placeholder="Langues parlées" value={form.languages} onChange={(e) => setForm({ ...form, languages: e.target.value })}
-                className="bb-input w-full text-sm" />
-              <input placeholder="Ville (Canada)" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })}
-                className="bb-input w-full text-sm" />
-              <input placeholder="Depuis quand au Canada ? (ex: 4 mois)" value={form.arrivedSince} onChange={(e) => setForm({ ...form, arrivedSince: e.target.value })}
-                className="bb-input w-full text-sm" />
-
-              <div className="flex gap-2 flex-wrap">
-                {LOOKING_FOR.map((opt) => (
-                  <button type="button" key={opt} onClick={() => setForm({ ...form, lookingFor: opt })}
-                    className={`bb-pill text-xs font-semibold px-3 py-2 rounded-full ${form.lookingFor === opt ? "bb-pill-active" : ""}`}>
-                    {opt}
-                  </button>
-                ))}
-              </div>
-
-              <input placeholder="Profession / métier" value={form.occupation} onChange={(e) => setForm({ ...form, occupation: e.target.value })}
-                className="bb-input w-full text-sm" />
-              <input placeholder="Centres d'intérêt (ex : cuisine, danse, foot...)" value={form.interests} onChange={(e) => setForm({ ...form, interests: e.target.value })}
-                className="bb-input w-full text-sm" />
-
-              <div>
-                <p className="text-xs mb-1.5" style={{ color: "rgba(43,36,32,0.55)" }}>Niveau d'études</p>
-                <div className="flex gap-2 flex-wrap">
-                  {EDUCATION_LEVELS.map((opt) => (
-                    <button type="button" key={opt} onClick={() => setForm({ ...form, educationLevel: opt })}
-                      className={`bb-pill text-xs font-semibold px-3 py-2 rounded-full ${form.educationLevel === opt ? "bb-pill-active" : ""}`}>
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs mb-1.5" style={{ color: "rgba(43,36,32,0.55)" }}>As-tu des enfants ?</p>
-                <div className="flex gap-2">
-                  {HAS_CHILDREN_OPTIONS.map((opt) => (
-                    <button type="button" key={opt} onClick={() => setForm({ ...form, hasChildren: opt })}
-                      className={`bb-pill text-xs font-semibold px-3 py-2 rounded-full ${form.hasChildren === opt ? "bb-pill-active" : ""}`}>
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <textarea placeholder="Une courte bio..." value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })}
-                rows={3} className="bb-input w-full text-sm" />
-
-              <button type="submit" disabled={saving} className="bb-btn bb-btn-primary mt-2 py-3 rounded-full font-semibold text-sm">
-                {saving ? "Création..." : "Créer mon profil"}
-              </button>
-            </form>
-          </div>
+          <CreateProfileForm
+            form={form}
+            setForm={setForm}
+            photoPreviews={photoPreviews}
+            handlePhotosSelected={handlePhotosSelected}
+            removePhotoFile={removePhotoFile}
+            saving={saving}
+            handleCreateProfile={handleCreateProfile}
+          />
         )}
 
         {/* ---------- ÉDITION DE PROFIL ---------- */}
         {view === "editProfile" && editForm && (
-          <div className="p-6 max-w-md mx-auto w-full">
-            <button onClick={() => setView("discover")} className="flex items-center gap-1 text-sm mb-4" style={{ color: C.indigo }}>
-              <ArrowLeft size={16} /> Retour
-            </button>
-            <h2 style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 24, color: C.indigo }} className="mb-4">
-              Modifier mon profil
-            </h2>
-
-            <label className="cursor-pointer block mb-4" style={{ position: "relative" }}>
-              <div
-                className="w-full rounded-2xl flex items-center justify-center"
-                style={{
-                  height: 120,
-                  background: coverPreview || currentUser?.cover_url
-                    ? `url(${coverPreview || currentUser.cover_url}) center/cover`
-                    : `linear-gradient(150deg, ${C.ochre}, ${C.clay} 55%, ${C.indigo} 130%)`,
-                }}
-              >
-                {!coverPreview && !currentUser?.cover_url && (
-                  <span className="text-xs font-semibold flex items-center gap-1.5" style={{ color: "#fff" }}>
-                    <Camera size={14} /> Ajouter une photo de couverture
-                  </span>
-                )}
-              </div>
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  setCoverFile(file);
-                  const reader = new FileReader();
-                  reader.onload = () => setCoverPreview(reader.result);
-                  reader.readAsDataURL(file);
-                }}
-              />
-            </label>
-
-            <form onSubmit={handleSaveProfile} className="flex flex-col gap-3">
-              <div className="mb-2">
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {existingPhotos.map((photo) => (
-                    <div key={photo.id} style={{ position: "relative" }}>
-                      <img src={photo.url} alt="Photo" style={{ width: 72, height: 72, borderRadius: "var(--bb-radius-sm)", objectFit: "cover", boxShadow: "var(--bb-shadow-sm)" }} />
-                      <button type="button" onClick={() => removeExistingPhoto(photo)}
-                        style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: C.indigo, color: "#fff", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                  {newPhotoPreviews.map((src, i) => (
-                    <div key={`new-${i}`} style={{ position: "relative" }}>
-                      <img src={src} alt={`Nouvelle photo ${i + 1}`} style={{ width: 72, height: 72, borderRadius: "var(--bb-radius-sm)", objectFit: "cover", boxShadow: "var(--bb-shadow-sm)" }} />
-                      <button type="button" onClick={() => removeNewPhotoFile(i)}
-                        style={{ position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: "50%", background: C.indigo, color: "#fff", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                  {existingPhotos.length + newPhotoPreviews.length < MAX_PHOTOS && (
-                    <label className="cursor-pointer flex items-center justify-center transition-colors hover:bg-black/[0.02]" style={{ width: 72, height: 72, borderRadius: "var(--bb-radius-sm)", border: "1.5px dashed rgba(43,36,32,0.28)" }}>
-                      <span className="text-xs text-center px-1" style={{ color: "rgba(43,36,32,0.5)" }}>+ Ajouter</span>
-                      <input type="file" accept="image/*" multiple onChange={handleNewPhotosSelected} className="hidden" />
-                    </label>
-                  )}
-                </div>
-                <p className="text-xs" style={{ color: "rgba(43,36,32,0.5)" }}>
-                  Jusqu'à {MAX_PHOTOS} photos. La première est ta photo principale.
-                </p>
-              </div>
-
-              <input placeholder="Prénom" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                className="bb-input w-full text-sm" />
-              <input placeholder="Âge" type="number" value={editForm.age} onChange={(e) => setEditForm({ ...editForm, age: e.target.value })}
-                className="bb-input w-full text-sm" />
-              <input placeholder="Pays d'origine" value={editForm.country} onChange={(e) => setEditForm({ ...editForm, country: e.target.value })}
-                className="bb-input w-full text-sm" />
-              <input placeholder="Langues parlées" value={editForm.languages} onChange={(e) => setEditForm({ ...editForm, languages: e.target.value })}
-                className="bb-input w-full text-sm" />
-              <input placeholder="Ville (Canada)" value={editForm.city} onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
-                className="bb-input w-full text-sm" />
-              <input placeholder="Depuis quand au Canada ?" value={editForm.arrivedSince} onChange={(e) => setEditForm({ ...editForm, arrivedSince: e.target.value })}
-                className="bb-input w-full text-sm" />
-
-              <div className="flex gap-2 flex-wrap">
-                {LOOKING_FOR.map((opt) => (
-                  <button type="button" key={opt} onClick={() => setEditForm({ ...editForm, lookingFor: opt })}
-                    className={`bb-pill text-xs font-semibold px-3 py-2 rounded-full ${editForm.lookingFor === opt ? "bb-pill-active" : ""}`}>
-                    {opt}
-                  </button>
-                ))}
-              </div>
-
-              <input placeholder="Profession / métier" value={editForm.occupation} onChange={(e) => setEditForm({ ...editForm, occupation: e.target.value })}
-                className="bb-input w-full text-sm" />
-              <input placeholder="Centres d'intérêt" value={editForm.interests} onChange={(e) => setEditForm({ ...editForm, interests: e.target.value })}
-                className="bb-input w-full text-sm" />
-
-              <div>
-                <p className="text-xs mb-1.5" style={{ color: "rgba(43,36,32,0.55)" }}>Niveau d'études</p>
-                <div className="flex gap-2 flex-wrap">
-                  {EDUCATION_LEVELS.map((opt) => (
-                    <button type="button" key={opt} onClick={() => setEditForm({ ...editForm, educationLevel: opt })}
-                      className={`bb-pill text-xs font-semibold px-3 py-2 rounded-full ${editForm.educationLevel === opt ? "bb-pill-active" : ""}`}>
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs mb-1.5" style={{ color: "rgba(43,36,32,0.55)" }}>As-tu des enfants ?</p>
-                <div className="flex gap-2">
-                  {HAS_CHILDREN_OPTIONS.map((opt) => (
-                    <button type="button" key={opt} onClick={() => setEditForm({ ...editForm, hasChildren: opt })}
-                      className={`bb-pill text-xs font-semibold px-3 py-2 rounded-full ${editForm.hasChildren === opt ? "bb-pill-active" : ""}`}>
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <textarea placeholder="Une courte bio..." value={editForm.bio} onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
-                rows={3} className="bb-input w-full text-sm" />
-
-              <button type="submit" disabled={savingProfile} className="bb-btn bb-btn-primary mt-2 py-3 rounded-full font-semibold text-sm">
-                {savingProfile ? "Enregistrement..." : "Enregistrer les modifications"}
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* ---------- DISCOVER ---------- */}
-        {view === "discover" && currentUser && (
-          <div className="p-6 max-w-md mx-auto w-full flex-1 flex flex-col items-center">
-            {matchNotice && (
-              <div className="bb-fade-in fixed inset-0 flex items-center justify-center z-20" style={{ background: "rgba(20,29,56,0.55)", backdropFilter: "blur(3px)" }}>
-                <div className="bb-card p-6 text-center max-w-xs mx-4" style={{ boxShadow: "var(--bb-shadow-lg)" }}>
-                  <Sparkles color={C.ochre} className="mx-auto mb-2" />
-                  <div style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 22, color: C.indigo }}>C'est un match !</div>
-                  <p className="text-sm my-3" style={{ color: "rgba(43,36,32,0.65)" }}>
-                    Toi et {matchNotice.name} vous êtes plu mutuellement.
-                  </p>
-                  <button onClick={() => { setMatchNotice(null); }} className="w-full py-2.5 rounded-full text-sm font-semibold" style={{ background: C.clay, color: "#fff" }}>
-                    Continuer
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {candidates.length === 0 || discoverIdx >= candidates.length ? (
-              <div className="text-center mt-16">
-                <p className="text-sm" style={{ color: "rgba(43,36,32,0.55)" }}>
-                  Plus de profils à découvrir pour l'instant. Invite d'autres testeurs à créer leur profil !
-                </p>
-              </div>
-            ) : (
-              (() => {
-                const p = candidates[discoverIdx];
-                const photos = profilePhotos[p.id]?.length ? profilePhotos[p.id] : (p.avatar_url ? [{ url: p.avatar_url }] : []);
-                const photoIdx = cardPhotoIdx[p.id] || 0;
-                const currentPhoto = photos[photoIdx]?.url;
-                return (
-                  <div className="bb-card bb-fade-in w-full overflow-hidden" style={{ position: "relative" }}>
-                    <div style={{ position: "absolute", top: 12, right: 12, zIndex: 5 }}>
-                      <button
-                        onClick={() => setMenuOpenFor(menuOpenFor === p.id ? null : p.id)}
-                        className="bb-icon-btn w-8 h-8 rounded-full flex items-center justify-center"
-                        style={{ background: "rgba(20,29,56,0.5)" }}
-                      >
-                        <MoreVertical size={16} color="#fff" />
-                      </button>
-                      {menuOpenFor === p.id && (
-                        <div className="mt-1 rounded-xl overflow-hidden bg-white" style={{ border: "1px solid rgba(43,36,32,0.1)", minWidth: 160 }}>
-                          <button
-                            onClick={() => { setReportTarget(p); setMenuOpenFor(null); }}
-                            className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left"
-                            style={{ color: C.ink }}
-                          >
-                            <Flag size={14} /> Signaler
-                          </button>
-                          <button
-                            onClick={() => handleBlock(p)}
-                            className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left"
-                            style={{ color: C.clay, borderTop: "1px solid rgba(43,36,32,0.08)" }}
-                          >
-                            <Ban size={14} /> Bloquer
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <div className="h-48 flex items-end p-4" style={{
-                      position: "relative",
-                      background: currentPhoto
-                        ? `linear-gradient(rgba(20,29,56,0) 40%, rgba(20,29,56,0.75)), url(${currentPhoto}) center/cover`
-                        : `linear-gradient(150deg, ${C.ochre}, ${C.clay} 55%, ${C.indigo} 130%)`
-                    }}>
-                      {photos.length > 1 && (
-                        <>
-                          <button onClick={(ev) => prevCardPhoto(p.id, photos.length, ev)}
-                            style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: "35%" }} aria-label="Photo précédente" />
-                          <button onClick={(ev) => nextCardPhoto(p.id, photos.length, ev)}
-                            style={{ position: "absolute", right: 0, top: 0, bottom: 0, width: "35%" }} aria-label="Photo suivante" />
-                          <div style={{ position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 4 }}>
-                            {photos.map((_, i) => (
-                              <div key={i} style={{ width: 6, height: 6, borderRadius: "50%", background: i === photoIdx ? "#fff" : "rgba(255,255,255,0.4)" }} />
-                            ))}
-                          </div>
-                        </>
-                      )}
-                      <div style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 26, color: "#fff" }}>{p.name}, {p.age}</div>
-                    </div>
-                    <div className="p-4">
-                      <div className="flex flex-wrap gap-1.5 mb-3">
-                        <span className="bb-badge">{p.country}</span>
-                        <span className="bb-badge">{p.languages}</span>
-                        <span className="bb-badge">{p.city}</span>
-                        <span className="bb-badge">Arrivé·e {p.arrived_since}</span>
-                        {p.occupation && <span className="bb-badge">{p.occupation}</span>}
-                        {p.education_level && <span className="bb-badge">{p.education_level}</span>}
-                        {p.has_children && <span className="bb-badge">{p.has_children === "Oui" ? "A des enfants" : "Sans enfant"}</span>}
-                      </div>
-                      {p.interests && (
-                        <p className="text-xs mb-2" style={{ color: "rgba(43,36,32,0.55)" }}>
-                          <span style={{ fontWeight: 600 }}>Intérêts : </span>{p.interests}
-                        </p>
-                      )}
-                      <p className="text-sm mb-4" style={{ color: "rgba(43,36,32,0.7)" }}>{p.bio || "—"}</p>
-                      <div className="flex justify-center gap-4">
-                        <button onClick={() => handlePass(p)} className="bb-btn bb-btn-pass w-14 h-14 rounded-full flex items-center justify-center">
-                          <X />
-                        </button>
-                        <button onClick={() => handleLike(p)} className="bb-btn bb-btn-heart w-14 h-14 rounded-full flex items-center justify-center">
-                          <Heart fill="#fff" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()
-            )}
-          </div>
-        )}
-
-        {/* ---------- MATCHES ---------- */}
-        {view === "matches" && currentUser && (
-          <div className="p-6 max-w-md mx-auto w-full">
-            <h2 style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 22, color: C.indigo }} className="mb-4">Mes matchs</h2>
-            {getMatches().length === 0 ? (
-              <p className="text-sm" style={{ color: "rgba(43,36,32,0.55)" }}>Pas encore de match. Continue à découvrir des profils !</p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {getMatches().map((m) => (
-                  <button key={m.id} onClick={() => openChat(m)} className="bb-btn flex items-center gap-3 p-3 text-left" style={{ background: "#fff", border: "1px solid var(--bb-border)", borderRadius: "var(--bb-radius-md)", boxShadow: "var(--bb-shadow-sm)" }}>
-                    <div style={{ position: "relative" }}>
-                      <Avatar name={m.name} url={m.avatar_url} />
-                      <Circle
-                        size={10}
-                        fill={m.is_online ? "#4CAF6D" : "#9aa0ab"}
-                        color="transparent"
-                        style={{ position: "absolute", bottom: -1, right: -1, background: "#fff", borderRadius: "50%" }}
-                      />
-                    </div>
-                    <div>
-                      <div className="text-sm font-semibold">{m.name}</div>
-                      <div className="text-xs" style={{ color: "rgba(43,36,32,0.5)" }}>
-                        {m.is_online ? "En ligne" : formatLastSeen(m.last_seen)} · {m.city}
-                      </div>
-                    </div>
-                    <MessageCircle className="ml-auto" size={18} color={C.indigo} />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <EditProfileForm
+            setView={setView}
+            editForm={editForm}
+            setEditForm={setEditForm}
+            coverPreview={coverPreview}
+            currentUser={currentUser}
+            setCoverFile={setCoverFile}
+            setCoverPreview={setCoverPreview}
+            existingPhotos={existingPhotos}
+            removeExistingPhoto={removeExistingPhoto}
+            newPhotoPreviews={newPhotoPreviews}
+            removeNewPhotoFile={removeNewPhotoFile}
+            handleNewPhotosSelected={handleNewPhotosSelected}
+            savingProfile={savingProfile}
+            handleSaveProfile={handleSaveProfile}
+          />
         )}
 
         {/* ---------- CHAT ---------- */}
         {view === "chat" && activeMatch && (
-          <div className="flex flex-col flex-1 max-w-md mx-auto w-full">
-            <div className="flex items-center gap-3 p-4" style={{ borderBottom: "1px solid rgba(43,36,32,0.1)", position: "relative" }}>
-              <button onClick={() => setView("feed")}><ArrowLeft size={18} /></button>
-              <div style={{ position: "relative" }}>
-                <Avatar name={activeMatch.name} url={activeMatch.avatar_url} size={34} />
-                <Circle
-                  size={10}
-                  fill={activeMatch.is_online ? "#4CAF6D" : "#9aa0ab"}
-                  color="transparent"
-                  style={{ position: "absolute", bottom: -1, right: -1, background: "#fff", borderRadius: "50%" }}
-                />
-              </div>
-              <div>
-                <div className="text-sm font-semibold">{activeMatch.name}</div>
-                <div className="text-xs" style={{ color: otherTyping ? C.clay : "rgba(43,36,32,0.45)" }}>
-                  {otherTyping ? "en train d'écrire…" : activeMatch.is_online ? "En ligne" : formatLastSeen(activeMatch.last_seen)}
-                </div>
-              </div>
-              <button onClick={() => refreshMessages(activeMatch)} className="ml-auto text-xs" style={{ color: C.indigo }}>Actualiser</button>
-              <button onClick={() => setMenuOpenFor(menuOpenFor === activeMatch.id ? null : activeMatch.id)} className="ml-1">
-                <MoreVertical size={18} color={C.ink} />
-              </button>
-              {menuOpenFor === activeMatch.id && (
-                <div className="rounded-xl overflow-hidden bg-white" style={{ border: "1px solid rgba(43,36,32,0.1)", position: "absolute", top: 48, right: 12, minWidth: 160, zIndex: 5 }}>
-                  <button
-                    onClick={() => { setReportTarget(activeMatch); setMenuOpenFor(null); }}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left"
-                    style={{ color: C.ink }}
-                  >
-                    <Flag size={14} /> Signaler
-                  </button>
-                  <button
-                    onClick={() => handleBlock(activeMatch)}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left"
-                    style={{ color: C.clay, borderTop: "1px solid rgba(43,36,32,0.08)" }}
-                  >
-                    <Ban size={14} /> Bloquer
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="flex-1 p-4 flex flex-col gap-1 overflow-y-auto">
-              {messages.length === 0 && (
-                <p className="text-xs text-center mt-6" style={{ color: "rgba(43,36,32,0.45)" }}>Dites bonjour 👋</p>
-              )}
-              {messages.map((m, i) => {
-                const prev = messages[i - 1];
-                const showDaySeparator = !prev || formatDayLabel(prev.created_at) !== formatDayLabel(m.created_at);
-                const isMine = m.from_id === currentUser.id;
-                const groupedWithPrev = prev && !showDaySeparator && prev.from_id === m.from_id;
-                return (
-                  <React.Fragment key={m.id}>
-                    {showDaySeparator && (
-                      <div className="flex justify-center my-3">
-                        <span className="text-[11px] font-semibold px-3 py-1 rounded-full" style={{ background: "rgba(43,36,32,0.06)", color: "rgba(43,36,32,0.5)" }}>
-                          {formatDayLabel(m.created_at)}
-                        </span>
-                      </div>
-                    )}
-                    <div
-                      className="bb-fade-in max-w-[75%] text-sm px-3.5 py-2.5 rounded-2xl flex items-end gap-1.5"
-                      style={{
-                        ...(isMine
-                          ? { alignSelf: "flex-end", background: C.indigo, color: C.sand, borderBottomRightRadius: 4, boxShadow: "var(--bb-shadow-sm)" }
-                          : { alignSelf: "flex-start", background: C.sand, color: C.ink, borderBottomLeftRadius: 4 }),
-                        marginTop: groupedWithPrev ? 2 : 10,
-                      }}
-                    >
-                      <span>{m.text}</span>
-                      <span className="text-[10px] flex-shrink-0 flex items-center gap-0.5" style={{ opacity: 0.6, whiteSpace: "nowrap" }}>
-                        {formatMessageTime(m.created_at)}
-                        {isMine && <CheckCheck size={12} />}
-                      </span>
-                    </div>
-                  </React.Fragment>
-                );
-              })}
-            </div>
-
-            {messages.length === 0 && (
-              <div className="px-4 pb-2 flex flex-col gap-1.5">
-                {iceBreakers.map((ib) => (
-                  <button key={ib} onClick={() => setMessageDraft(ib)} className="bb-btn text-left text-xs px-3 py-2.5" style={{ background: "#fff", border: "1px solid var(--bb-border)", borderRadius: "var(--bb-radius-sm)", color: C.indigo }}>
-                    {ib}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <div className="p-4 flex gap-2" style={{ borderTop: "1px solid rgba(43,36,32,0.08)", paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
-              <input
-                value={messageDraft}
-                onChange={(e) => { setMessageDraft(e.target.value); broadcastTyping(); }}
-                onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-                placeholder="Écris un message..."
-                className="bb-input flex-1 text-sm"
-                style={{ borderRadius: 999, fontSize: 16, minHeight: 44 }}
-              />
-              <button onClick={sendMessage} className="bb-btn bb-btn-heart w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ minWidth: 44, minHeight: 44 }}>
-                <Send size={16} />
-              </button>
-            </div>
-          </div>
+          <ChatScreen
+            activeMatch={activeMatch}
+            setView={setView}
+            currentUser={currentUser}
+            otherTyping={otherTyping}
+            refreshMessages={refreshMessages}
+            menuOpenFor={menuOpenFor}
+            setMenuOpenFor={setMenuOpenFor}
+            setReportTarget={setReportTarget}
+            handleBlock={handleBlock}
+            messages={messages}
+            messageDraft={messageDraft}
+            setMessageDraft={setMessageDraft}
+            broadcastTyping={broadcastTyping}
+            sendMessage={sendMessage}
+          />
         )}
       </div>
 
-      {/* ---------- MODAL SIGNALEMENT ---------- */}
-      {reportTarget && (
-        <div className="bb-fade-in fixed inset-0 flex items-center justify-center z-30" style={{ background: "rgba(20,29,56,0.55)", backdropFilter: "blur(3px)" }}>
-          <div className="bb-card p-6 max-w-xs mx-4 w-full" style={{ boxShadow: "var(--bb-shadow-lg)" }}>
-            <div style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 20, color: C.indigo }} className="mb-1">
-              Signaler {reportTarget.name}
-            </div>
-            <p className="text-sm mb-3" style={{ color: "rgba(43,36,32,0.6)" }}>
-              Explique brièvement pourquoi. On examinera ton signalement.
-            </p>
-            <textarea
-              value={reportReason}
-              onChange={(e) => setReportReason(e.target.value)}
-              rows={3}
-              placeholder="Ex : comportement déplacé, faux profil..."
-              className="w-full p-3 rounded-lg text-sm mb-3"
-              style={{ border: "1px solid rgba(43,36,32,0.15)" }}
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setReportTarget(null); setReportReason(""); }}
-                className="flex-1 py-2.5 rounded-full text-sm font-semibold"
-                style={{ border: "1px solid rgba(43,36,32,0.15)", color: C.ink }}
-              >
-                Annuler
-              </button>
-              <button
-                onClick={submitReport}
-                disabled={reportSending || !reportReason.trim()}
-                className="flex-1 py-2.5 rounded-full text-sm font-semibold disabled:opacity-60"
-                style={{ background: C.clay, color: "#fff" }}
-              >
-                {reportSending ? "Envoi..." : "Envoyer"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ---------- MODAL PARAMÈTRES ---------- */}
-      {settingsOpen && (
-        <div className="bb-fade-in fixed inset-0 flex items-end justify-center z-30" style={{ background: "rgba(20,29,56,0.55)", backdropFilter: "blur(3px)" }} onClick={() => setSettingsOpen(false)}>
-          <div className="bb-card p-6 w-full max-w-md" style={{ borderRadius: "20px 20px 0 0" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 20, color: C.indigo }} className="mb-4">
-              Paramètres
-            </div>
-            <div className="flex items-center justify-between py-2.5" style={{ borderTop: "1px solid rgba(43,36,32,0.08)" }}>
-              <div className="flex items-center gap-2 text-sm"><Circle size={14} color={C.acacia || C.ochre} /> Statut en ligne visible</div>
-              <input type="checkbox" defaultChecked onChange={(e) => setIsOnline(e.target.checked)} />
-            </div>
-            <div className="flex items-center justify-between py-2.5" style={{ borderTop: "1px solid rgba(43,36,32,0.08)" }}>
-              <div className="flex items-center gap-2 text-sm"><Bell size={14} color={C.ochre} /> Notifications</div>
-              <input type="checkbox" defaultChecked />
-            </div>
-            <div className="flex items-center justify-between py-2.5" style={{ borderTop: "1px solid rgba(43,36,32,0.08)" }}>
-              <div className="flex items-center gap-2 text-sm"><Moon size={14} color={C.indigo} /> Mode sombre</div>
-              <span className="text-xs" style={{ color: "rgba(43,36,32,0.4)" }}>Bientôt</span>
-            </div>
-            <button onClick={() => { setSettingsOpen(false); setPrivacyOpen(true); }} className="w-full flex items-center justify-between py-3" style={{ borderTop: "1px solid rgba(43,36,32,0.08)", minHeight: 44 }}>
-              <span className="flex items-center gap-2 text-sm"><Shield size={14} color={C.indigo} /> Politique de confidentialité</span>
-              <ArrowLeft size={14} style={{ transform: "rotate(180deg)", color: "rgba(43,36,32,0.35)" }} />
-            </button>
-            <button onClick={() => { setSettingsOpen(false); setTermsOpen(true); }} className="w-full flex items-center justify-between py-3" style={{ borderTop: "1px solid rgba(43,36,32,0.08)", minHeight: 44 }}>
-              <span className="flex items-center gap-2 text-sm"><Info size={14} color={C.indigo} /> Conditions d'utilisation</span>
-              <ArrowLeft size={14} style={{ transform: "rotate(180deg)", color: "rgba(43,36,32,0.35)" }} />
-            </button>
-            <button onClick={() => setSettingsOpen(false)} className="w-full mt-4 py-3 rounded-full text-sm font-semibold" style={{ border: "1px solid rgba(43,36,32,0.15)", color: C.ink, minHeight: 44 }}>
-              Fermer
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ---------- MODAL POLITIQUE DE CONFIDENTIALITÉ ---------- */}
-      {privacyOpen && (
-        <div className="bb-fade-in fixed inset-0 flex items-end justify-center z-30" style={{ background: "rgba(20,29,56,0.55)", backdropFilter: "blur(3px)" }} onClick={() => setPrivacyOpen(false)}>
-          <div className="bb-card p-6 w-full max-w-md" style={{ borderRadius: "20px 20px 0 0", maxHeight: "80vh", overflowY: "auto", paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 20, color: C.indigo }} className="mb-3">
-              Politique de confidentialité
-            </div>
-            <div className="text-sm" style={{ color: "rgba(43,36,32,0.72)" }}>
-              <PrivacyPolicyContent />
-            </div>
-            <button onClick={() => setPrivacyOpen(false)} className="w-full py-3 mt-2 rounded-full text-sm font-semibold" style={{ border: "1px solid rgba(43,36,32,0.15)", color: C.ink, minHeight: 44 }}>
-              Fermer
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ---------- MODAL CONDITIONS D'UTILISATION ---------- */}
-      {termsOpen && (
-        <div className="bb-fade-in fixed inset-0 flex items-end justify-center z-30" style={{ background: "rgba(20,29,56,0.55)", backdropFilter: "blur(3px)" }} onClick={() => setTermsOpen(false)}>
-          <div className="bb-card p-6 w-full max-w-md" style={{ borderRadius: "20px 20px 0 0", maxHeight: "80vh", overflowY: "auto", paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 20, color: C.indigo }} className="mb-3">
-              Conditions d'utilisation
-            </div>
-            <div className="text-sm" style={{ color: "rgba(43,36,32,0.72)" }}>
-              <TermsOfServiceContent />
-            </div>
-            <button onClick={() => setTermsOpen(false)} className="w-full py-3 mt-2 rounded-full text-sm font-semibold" style={{ border: "1px solid rgba(43,36,32,0.15)", color: C.ink, minHeight: 44 }}>
-              Fermer
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ---------- MODAL À PROPOS ---------- */}
-      {aboutOpen && (
-        <div className="bb-fade-in fixed inset-0 flex items-end justify-center z-30" style={{ background: "rgba(20,29,56,0.55)", backdropFilter: "blur(3px)" }} onClick={() => setAboutOpen(false)}>
-          <div className="bb-card p-6 w-full max-w-md text-center" style={{ borderRadius: "20px 20px 0 0" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontWeight: 600, fontSize: 24, color: C.indigo }} className="mb-1">
-              Baobab
-            </div>
-            <p className="text-sm mb-4" style={{ color: "rgba(43,36,32,0.6)" }}>
-              L'app de rencontres pensée pour la communauté qui s'installe au Canada.
-            </p>
-            <p style={{ fontFamily: "monospace", fontSize: 11, letterSpacing: "0.06em", color: "rgba(43,36,32,0.45)" }}>
-              BAOBAB — BY LESSI PATRICK
-            </p>
-            <button onClick={() => setAboutOpen(false)} className="w-full mt-4 py-2.5 rounded-full text-sm font-semibold" style={{ border: "1px solid rgba(43,36,32,0.15)", color: C.ink }}>
-              Fermer
-            </button>
-          </div>
-        </div>
-      )}
+      <AppModals
+        reportTarget={reportTarget}
+        setReportTarget={setReportTarget}
+        reportReason={reportReason}
+        setReportReason={setReportReason}
+        reportSending={reportSending}
+        submitReport={submitReport}
+        settingsOpen={settingsOpen}
+        setSettingsOpen={setSettingsOpen}
+        setIsOnline={setIsOnline}
+        privacyOpen={privacyOpen}
+        setPrivacyOpen={setPrivacyOpen}
+        termsOpen={termsOpen}
+        setTermsOpen={setTermsOpen}
+        aboutOpen={aboutOpen}
+        setAboutOpen={setAboutOpen}
+      />
 
       {/* Bottom nav */}
       {currentUser && view !== "form" && view !== "editProfile" && (
