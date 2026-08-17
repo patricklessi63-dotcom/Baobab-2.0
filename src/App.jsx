@@ -14,6 +14,8 @@ import ChatScreen from "./screens/ChatScreen";
 import UpdatePasswordScreen from "./screens/UpdatePasswordScreen";
 import OnboardingWizard from "./screens/onboarding/OnboardingWizard";
 import { computeAge } from "./screens/onboarding/steps/Step1Identity";
+import MatchCelebrationModal from "./components/social/MatchCelebrationModal";
+import { filterCandidatesByPreferences } from "./lib/matching/matchingService";
 
 export default function App() {
   const [session, setSession] = useState(undefined); // undefined = pas encore vérifié, null = pas connecté
@@ -282,6 +284,21 @@ export default function App() {
       if (toggleError) throw toggleError;
     } catch (e) {
       console.error(e);
+    }
+  }
+
+  async function handleSavePreferences(prefs) {
+    if (!currentUser) return;
+    setCurrentUser((u) => ({ ...u, ...prefs }));
+    try {
+      const { error: prefError } = await supabase
+        .from("profiles")
+        .update(prefs)
+        .eq("id", currentUser.id);
+      if (prefError) throw prefError;
+    } catch (e) {
+      console.error(e.message, e.code, e.details, e.hint);
+      setError("Impossible d'enregistrer tes préférences.");
     }
   }
 
@@ -563,13 +580,16 @@ export default function App() {
   }
 
   const candidates = currentUser
-    ? profiles.filter(
-        (p) =>
-          p.id !== currentUser.id &&
-          !hasLiked(currentUser.id, p.id) &&
-          !hasPassed(currentUser.id, p.id) &&
-          !hasBlocked(currentUser.id, p.id) &&
-          !hasBlocked(p.id, currentUser.id)
+    ? filterCandidatesByPreferences(
+        currentUser,
+        profiles.filter(
+          (p) =>
+            p.id !== currentUser.id &&
+            !hasLiked(currentUser.id, p.id) &&
+            !hasPassed(currentUser.id, p.id) &&
+            !hasBlocked(currentUser.id, p.id) &&
+            !hasBlocked(p.id, currentUser.id)
+        )
       )
     : [];
 
@@ -728,7 +748,19 @@ export default function App() {
   }
 
   if (currentUser && ["feed", "stories", "profile", "discover", "matches"].includes(view)) {
-    return <SocialShell currentUser={currentUser} setView={setView} handleSignOut={handleSignOut} candidates={candidates} getMatches={getMatches} openChat={openChat} handleLike={handleLike} handlePass={handlePass} profilePhotos={profilePhotos} openEditProfile={openEditProfile} setReportTarget={setReportTarget} handleBlock={handleBlock} />;
+    return (
+      <>
+        <SocialShell currentUser={currentUser} setView={setView} handleSignOut={handleSignOut} candidates={candidates} getMatches={getMatches} openChat={openChat} handleLike={handleLike} handlePass={handlePass} profilePhotos={profilePhotos} openEditProfile={openEditProfile} setReportTarget={setReportTarget} handleBlock={handleBlock} profiles={profiles} handleSavePreferences={handleSavePreferences} />
+        {matchNotice && (
+          <MatchCelebrationModal
+            match={matchNotice}
+            currentUser={currentUser}
+            onStartChat={() => { const m = matchNotice; setMatchNotice(null); openChat(m); }}
+            onDismiss={() => setMatchNotice(null)}
+          />
+        )}
+      </>
+    );
   }
 
   return (

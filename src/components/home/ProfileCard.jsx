@@ -3,9 +3,6 @@ import { Heart, X, MessageCircle } from "lucide-react";
 import VerifiedBadge from "../VerifiedBadge";
 import { coral, gold, green, muted } from "../social/theme";
 
-// Composant réutilisable, préparé pour recevoir plus tard un vrai score de
-// matching (compatibilityScore, matchReasons) sans changer son API — tant
-// que ces données n'existent pas, on n'affiche que ce qui est réel.
 export default function ProfileCard({
   profile,
   highlight,
@@ -45,6 +42,15 @@ export default function ProfileCard({
             <VerifiedBadge emailVerified={profile.email_verified} phoneVerified={profile.phone_verified} size={13} />
           </span>
         )}
+        {typeof compatibilityScore === "number" && (
+          <span
+            className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-black text-white"
+            style={{ background: "rgba(21,27,61,.55)", backdropFilter: "blur(4px)" }}
+            title="Compatibilité estimée — pas une garantie"
+          >
+            ~{compatibilityScore}%
+          </span>
+        )}
       </div>
 
       <div className="p-3">
@@ -54,6 +60,11 @@ export default function ProfileCard({
         {commonInterestsCount > 0 && (
           <div className="text-[10px] mt-1 truncate font-semibold" style={{ color: green }}>
             {commonInterestsCount} centre{commonInterestsCount > 1 ? "s" : ""} d'intérêt en commun
+          </div>
+        )}
+        {Array.isArray(matchReasons) && matchReasons[0] && (
+          <div className="text-[10px] mt-1 truncate" style={{ color: muted }} title={matchReasons[0]}>
+            🌱 {matchReasons[0]}
           </div>
         )}
 

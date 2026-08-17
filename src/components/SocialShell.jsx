@@ -13,6 +13,8 @@ import StoryViewerModal from "./social/StoryViewerModal";
 import StoryComposerModal from "./social/StoryComposerModal";
 import EventComposerModal from "./social/EventComposerModal";
 import PublicProfileModal from "./social/PublicProfileModal";
+import FavoritesModal from "./social/FavoritesModal";
+import MatchPreferencesModal from "./social/MatchPreferencesModal";
 
 const STORY_COLORS = ["#E56B5D", "#2F8F6B", "#5667A9", "#F2B84B", "#C1613D", "#1E2A4F"];
 function colorForProfile(id) {
@@ -34,7 +36,11 @@ export default function SocialShell({
   openEditProfile = () => setView("editProfile"),
   setReportTarget = () => {},
   handleBlock = () => {},
+  profiles = [],
+  handleSavePreferences = () => {},
 }) {
+  const [favoritesOpen, setFavoritesOpen] = useState(false);
+  const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [tab, setTab] = useState("feed");
   const [profileTab, setProfileTab] = useState("posts");
   const [composer, setComposer] = useState(false);
@@ -282,9 +288,12 @@ export default function SocialShell({
 
   const matches = getMatches();
   const viewedProfile = viewedProfileId
-    ? [...candidates, ...matches].find((p) => p.id === viewedProfileId) || null
+    ? profiles.find((p) => p.id === viewedProfileId)
+      || [...candidates, ...matches].find((p) => p.id === viewedProfileId)
+      || null
     : null;
   const viewedProfileIsMatch = viewedProfile ? matches.some((m) => m.id === viewedProfile.id) : false;
+  const favoriteProfiles = profiles.filter((p) => favoriteIds.has(p.id));
 
   const firstName = currentUser?.name?.split(" ")[0] || "toi";
 
@@ -702,6 +711,14 @@ export default function SocialShell({
             decideSwipe={decideSwipe}
             currentUser={currentUser}
             onViewProfile={(p) => setViewedProfileId(p.id)}
+            handleLike={handleLike}
+            handlePass={handlePass}
+            matches={matches}
+            favoriteIds={favoriteIds}
+            toggleFavorite={toggleFavorite}
+            setReportTarget={setReportTarget}
+            handleBlock={handleBlock}
+            openChat={openChat}
           />
         )}
 
@@ -725,6 +742,9 @@ export default function SocialShell({
             setComposer={setComposer}
             goTab={goTab}
             profilePhotos={profilePhotos}
+            favoritesCount={favoriteProfiles.length}
+            onOpenFavorites={() => setFavoritesOpen(true)}
+            onOpenPreferences={() => setPreferencesOpen(true)}
           />
         )}
       </main>
@@ -819,6 +839,22 @@ export default function SocialShell({
           onBlock={(p) => { setViewedProfileId(null); handleBlock(p); }}
         />
       )}
+
+      <FavoritesModal
+        open={favoritesOpen}
+        onClose={() => setFavoritesOpen(false)}
+        favoriteProfiles={favoriteProfiles}
+        onViewProfile={(p) => { setFavoritesOpen(false); setViewedProfileId(p.id); }}
+        onToggleFavorite={toggleFavorite}
+        onDiscover={() => { setFavoritesOpen(false); goTab("discover"); }}
+      />
+
+      <MatchPreferencesModal
+        open={preferencesOpen}
+        onClose={() => setPreferencesOpen(false)}
+        currentUser={currentUser}
+        onSave={handleSavePreferences}
+      />
     </div>
   );
 }

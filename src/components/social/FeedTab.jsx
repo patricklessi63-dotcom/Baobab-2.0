@@ -9,7 +9,7 @@ import CommunityCard from "../home/CommunityCard";
 import BaobabProgress from "../home/BaobabProgress";
 import EmptyState from "../home/EmptyState";
 import EventCard from "../home/EventCard";
-import { countCommonInterests } from "../../lib/compatibility";
+import { rankCandidates } from "../../lib/matching/matchingService";
 import { formatEventWhen } from "../../utils/format";
 import { primary, green, coral, gold, bg, muted, card } from "./theme";
 
@@ -41,6 +41,9 @@ export default function FeedTab({
   goTab,
   setSearch,
 }) {
+  const rankedForYou = rankCandidates(currentUser, candidates);
+  const rankedNearby = rankCandidates(currentUser, nearbyMembers);
+  const rankedNewArrivals = rankCandidates(currentUser, newArrivals);
   return (
     <div className="max-w-6xl mx-auto">
       <HomeHeader currentUser={currentUser} />
@@ -115,12 +118,14 @@ export default function FeedTab({
               />
             ) : (
               <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
-                {candidates.slice(0, 8).map((p) => (
+                {rankedForYou.slice(0, 8).map(({ profile: p, match }) => (
                   <ProfileCard
                     key={p.id}
                     profile={p}
                     highlight="looking_for"
-                    commonInterestsCount={countCommonInterests(currentUser, p)}
+                    commonInterestsCount={match.commonInterests.length}
+                    compatibilityScore={match.score}
+                    matchReasons={match.reasons}
                     onLike={handleLike}
                     onPass={handlePass}
                   />
@@ -157,12 +162,14 @@ export default function FeedTab({
               />
             ) : (
               <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
-                {nearbyMembers.slice(0, 8).map((p) => (
+                {rankedNearby.slice(0, 8).map(({ profile: p, match }) => (
                   <ProfileCard
                     key={p.id}
                     profile={p}
                     highlight="looking_for"
-                    commonInterestsCount={countCommonInterests(currentUser, p)}
+                    commonInterestsCount={match.commonInterests.length}
+                    compatibilityScore={match.score}
+                    matchReasons={match.reasons}
                     onLike={handleLike}
                   />
                 ))}
@@ -184,12 +191,14 @@ export default function FeedTab({
               />
             ) : (
               <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
-                {newArrivals.slice(0, 8).map((p) => (
+                {rankedNewArrivals.slice(0, 8).map(({ profile: p, match }) => (
                   <ProfileCard
                     key={p.id}
                     profile={p}
                     highlight="arrived_since"
-                    commonInterestsCount={countCommonInterests(currentUser, p)}
+                    commonInterestsCount={match.commonInterests.length}
+                    compatibilityScore={match.score}
+                    matchReasons={match.reasons}
                     onLike={handleLike}
                   />
                 ))}

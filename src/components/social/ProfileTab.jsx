@@ -1,5 +1,5 @@
 import React from "react";
-import { Send, CheckCheck, Image as ImageIcon } from "lucide-react";
+import { Send, CheckCheck, Image as ImageIcon, Star, Target, ChevronRight } from "lucide-react";
 import Avatar from "../Avatar";
 import VerifiedBadge from "../VerifiedBadge";
 import { getProfileCompletion } from "../../lib/profileCompletion";
@@ -16,6 +16,9 @@ export default function ProfileTab({
   setComposer,
   goTab,
   profilePhotos = {},
+  favoritesCount = 0,
+  onOpenFavorites = () => {},
+  onOpenPreferences = () => {},
 }) {
           const myPosts = posts.filter((p) => p.name === currentUser?.name);
           const completion = getProfileCompletion(currentUser, profilePhotos[currentUser?.id] || []);
@@ -83,6 +86,17 @@ export default function ProfileTab({
 
                 <div className="grid grid-cols-3 gap-3 mt-6">
                   {[[matches.length, "Matchs"], [myPosts.length, "Publications"], [candidates.length, "Profils à découvrir"]].map(([value, label]) => <div key={label} className="rounded-2xl p-4 text-center" style={{ background: bg }}><b className="text-xl" style={{ color: primary }}>{value}</b><div className="text-[11px] mt-1" style={{ color: muted }}>{label}</div></div>)}
+                </div>
+
+                <div className="flex gap-3 mt-4">
+                  <button onClick={onOpenFavorites} className="flex-1 flex items-center justify-between rounded-2xl p-4" style={{ background: bg }}>
+                    <span className="flex items-center gap-2 text-sm font-bold" style={{ color: primary }}><Star size={16} color={gold} /> Mes favoris {favoritesCount > 0 && `(${favoritesCount})`}</span>
+                    <ChevronRight size={16} color={muted} />
+                  </button>
+                  <button onClick={onOpenPreferences} className="flex-1 flex items-center justify-between rounded-2xl p-4" style={{ background: bg }}>
+                    <span className="flex items-center gap-2 text-sm font-bold" style={{ color: primary }}><Target size={16} color={coral} /> Préférences</span>
+                    <ChevronRight size={16} color={muted} />
+                  </button>
                 </div>
               </div>
 

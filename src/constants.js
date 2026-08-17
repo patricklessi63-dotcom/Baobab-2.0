@@ -74,3 +74,6 @@ export const LANGUAGES_OPTIONS = [
 export const LANGUAGE_LEVELS = ["Débutant", "Intermédiaire", "Avancé", "Courant"];
 
 export const ONBOARDING_STEP_COUNT = 9;
+
+// ---------- Phase 4 — Baobab Match ----------
+export const MATCH_DISTANCE_OPTIONS = ["Ma ville uniquement", "Ma ville ou mon pays", "Peu importe"];

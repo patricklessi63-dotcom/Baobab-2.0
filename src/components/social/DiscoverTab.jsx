@@ -1,8 +1,16 @@
-import React from "react";
-import { Heart, X } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { Heart, X, Info } from "lucide-react";
 import VerifiedBadge from "../VerifiedBadge";
-import { computeCompatibility } from "../../lib/compatibility";
+import ChipSelect from "../ChipSelect";
+import MatchCard from "./MatchCard";
+import MatchInfoModal from "./MatchInfoModal";
+import EmptyState from "../home/EmptyState";
+import { computeMatch, rankCandidates } from "../../lib/matching/matchingService";
+import { LOOKING_FOR_OPTIONS } from "../../constants";
 import { primary, green, coral, gold, bg, muted, card, buttonBase } from "./theme";
+
+const SORT_OPTIONS = ["✨ Pertinence", "📍 Proximité", "❤️ Intentions", "🆕 Nouveaux"];
+const GRID_PAGE_SIZE = 12;
 
 export default function DiscoverTab({
   filteredPeople,
@@ -19,15 +27,74 @@ export default function DiscoverTab({
   decideSwipe,
   currentUser,
   onViewProfile = () => {},
+  handleLike = () => {},
+  handlePass = () => {},
+  matches = [],
+  favoriteIds = new Set(),
+  toggleFavorite = () => {},
+  setReportTarget = () => {},
+  handleBlock = () => {},
+  openChat = () => {},
 }) {
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [mode, setMode] = useState("pile");
+  const [sort, setSort] = useState(SORT_OPTIONS[0]);
+  const [cityFilter, setCityFilter] = useState("");
+  const [intentionFilter, setIntentionFilter] = useState([]);
+  const [visibleCount, setVisibleCount] = useState(GRID_PAGE_SIZE);
+
+  const cityOptions = useMemo(
+    () => Array.from(new Set(filteredPeople.map((p) => (p.city || "").trim()).filter(Boolean))).sort(),
+    [filteredPeople]
+  );
+
+  const filteredForGrid = useMemo(() => {
+    return filteredPeople.filter((p) => {
+      if (cityFilter && (p.city || "").trim() !== cityFilter) return false;
+      if (intentionFilter.length > 0) {
+        const theirs = (p.looking_for || "").split(",").map((s) => s.trim());
+        if (!intentionFilter.some((f) => theirs.includes(f))) return false;
+      }
+      return true;
+    });
+  }, [filteredPeople, cityFilter, intentionFilter]);
+
+  const ranked = useMemo(() => rankCandidates(currentUser, filteredForGrid), [currentUser, filteredForGrid]);
+
+  const sorted = useMemo(() => {
+    const list = [...ranked];
+    if (sort === "📍 Proximité") {
+      list.sort((a, b) => {
+        const rank = (l) => (l.match.breakdown.location >= 10 ? 0 : l.match.breakdown.location > 0 ? 1 : 2);
+        return rank(a) - rank(b) || b.match.score - a.match.score;
+      });
+    } else if (sort === "❤️ Intentions") {
+      list.sort((a, b) => Number(b.match.compatibleIntentions) - Number(a.match.compatibleIntentions) || b.match.score - a.match.score);
+    } else if (sort === "🆕 Nouveaux") {
+      list.sort((a, b) => new Date(b.profile.created_at || 0) - new Date(a.profile.created_at || 0));
+    }
+    // "✨ Pertinence" (défaut) : déjà trié par score dans rankCandidates.
+    return list;
+  }, [ranked, sort]);
+
+  const visible = sorted.slice(0, visibleCount);
+
   return (
+    <>
           <section className="max-w-2xl mx-auto">
-            <div className="text-center mb-6">
+            <div className="text-center mb-4">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider" style={{ background: "#FFF1EC", color: coral }}><Heart size={13} fill={coral} /> Connexions qui ont du sens</div>
               <h1 className="text-3xl md:text-4xl font-black tracking-tight mt-3" style={{ color: primary }}>Découvrir</h1>
-              <p className="text-sm mt-1" style={{ color: muted }}>Glisse à droite pour aimer, à gauche pour passer.</p>
+              <p className="text-sm mt-1" style={{ color: muted }}>{mode === "pile" ? "Glisse à droite pour aimer, à gauche pour passer." : "Des profils classés selon ta compatibilité estimée."}</p>
             </div>
-            {filteredPeople.length === 0 ? (
+
+            <div className="flex justify-center gap-2 mb-6">
+              <button onClick={() => setMode("pile")} className="px-4 py-2 rounded-full text-xs font-bold" style={{ background: mode === "pile" ? primary : bg, color: mode === "pile" ? "#fff" : muted }}>🔥 Pile</button>
+              <button onClick={() => setMode("grid")} className="px-4 py-2 rounded-full text-xs font-bold" style={{ background: mode === "grid" ? primary : bg, color: mode === "grid" ? "#fff" : muted }}>🌱 Pour toi</button>
+            </div>
+
+            {mode === "pile" ? (
+            filteredPeople.length === 0 ? (
               <div className={`${card} p-10 text-center`}>
                 <div className="text-5xl mb-4">🌍</div>
                 <h2 className="text-xl font-black" style={{ color: primary }}>Pas encore de nouveaux profils</h2>
@@ -126,14 +193,15 @@ export default function DiscoverTab({
                         {p.interests && <div className="mb-4"><div className="text-[11px] font-black uppercase tracking-wider" style={{ color: muted }}>Centres d'intérêt</div><div className="text-sm mt-1">{p.interests}</div></div>}
 
                         {(() => {
-                          const compat = computeCompatibility(currentUser, p);
+                          const compat = computeMatch(currentUser, p);
                           const compatColor = compat.level === "high" ? green : compat.level === "medium" ? gold : muted;
                           return (
                             <div className="mb-4 rounded-2xl p-4" style={{ background: bg }}>
                               <div className="flex items-center justify-between mb-2">
-                                <span className="text-[11px] font-black uppercase tracking-wider" style={{ color: primary }}>🌱 Baobab Match</span>
+                                <button onClick={() => setInfoOpen(true)} className="text-[11px] font-black uppercase tracking-wider focus-visible:outline focus-visible:outline-2 flex items-center gap-1" style={{ color: primary }}>🌱 Baobab Match <Info size={12} /></button>
                                 <span className="text-lg font-black" style={{ color: compatColor }}>~{compat.score}%</span>
                               </div>
+                              <div className="text-[10px] font-bold uppercase tracking-wide -mt-1.5 mb-2" style={{ color: muted }}>Compatibilité estimée</div>
                               <div className="h-2 rounded-full bg-white overflow-hidden mb-3">
                                 <div className="h-full rounded-full" style={{ width: `${compat.score}%`, background: `linear-gradient(90deg,${gold},${green})` }} />
                               </div>
@@ -166,7 +234,79 @@ export default function DiscoverTab({
                   );
                 })()}
               </div>
+            )
+            ) : (
+              <div>
+                {filteredPeople.length === 0 ? (
+                  <div className={`${card} p-10`}>
+                    <EmptyState
+                      title="Ton réseau Baobab est encore en train de grandir 🌱"
+                      subtitle="De nouveaux membres arrivent régulièrement — reviens bientôt, ou complète ton profil pour de meilleures suggestions."
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div className={`${card} p-4 mb-4`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-black uppercase tracking-wider" style={{ color: muted }}>Trier par</span>
+                        <button onClick={() => setInfoOpen(true)} className="text-xs font-bold flex items-center gap-1 focus-visible:outline focus-visible:outline-2" style={{ color: primary }}><Info size={13} /> Comment ça marche ?</button>
+                      </div>
+                      <ChipSelect options={SORT_OPTIONS} value={sort} onChange={setSort} />
+                      {cityOptions.length > 0 && (
+                        <>
+                          <div className="text-xs font-black uppercase tracking-wider mt-3 mb-1.5" style={{ color: muted }}>Ville</div>
+                          <ChipSelect options={cityOptions} value={cityFilter} onChange={setCityFilter} />
+                        </>
+                      )}
+                      <div className="text-xs font-black uppercase tracking-wider mt-3 mb-1.5" style={{ color: muted }}>Intentions</div>
+                      <ChipSelect options={LOOKING_FOR_OPTIONS} value={intentionFilter} onChange={setIntentionFilter} multi />
+                    </div>
+
+                    {sorted.length === 0 ? (
+                      <div className={`${card} p-10`}>
+                        <EmptyState
+                          title="Aucun profil ne correspond à ces critères pour l'instant."
+                          subtitle="Élargis tes préférences pour voir plus de monde."
+                          actionLabel="Réinitialiser les filtres"
+                          onAction={() => { setCityFilter(""); setIntentionFilter([]); }}
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-sm mb-3" style={{ color: muted }}>
+                          {sorted.length} profil{sorted.length > 1 ? "s" : ""} correspond{sorted.length > 1 ? "ent" : ""} à tes critères.
+                        </p>
+                        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {visible.map(({ profile: p, match }) => (
+                            <MatchCard
+                              key={p.id}
+                              profile={p}
+                              match={match}
+                              isMatch={matches.some((m) => m.id === p.id)}
+                              isFavorite={favoriteIds.has(p.id)}
+                              onLike={handleLike}
+                              onPass={handlePass}
+                              onMessage={openChat}
+                              onToggleFavorite={toggleFavorite}
+                              onReport={(target) => setReportTarget(target)}
+                              onBlock={handleBlock}
+                              onViewProfile={onViewProfile}
+                            />
+                          ))}
+                        </div>
+                        {visibleCount < sorted.length && (
+                          <button onClick={() => setVisibleCount((c) => c + GRID_PAGE_SIZE)} className="w-full mt-5 py-3 rounded-xl font-bold text-sm" style={{ background: bg, color: primary }}>
+                            Afficher plus
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
             )}
           </section>
+          <MatchInfoModal open={infoOpen} onClose={() => setInfoOpen(false)} />
+    </>
   );
 }
