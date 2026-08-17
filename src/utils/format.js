@@ -30,3 +30,12 @@ export function formatDayLabel(iso) {
   if (sameDay(d, yesterday)) return "Hier";
   return d.toLocaleDateString("fr-CA", { day: "numeric", month: "long" });
 }
+
+export function formatEventWhen(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const weekday = d.toLocaleDateString("fr-CA", { weekday: "long" });
+  const label = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+  const time = d.toLocaleTimeString("fr-CA", { hour: "numeric", minute: d.getMinutes() ? "2-digit" : undefined });
+  return `${label} ${time}`;
+}

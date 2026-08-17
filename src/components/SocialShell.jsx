@@ -57,6 +57,8 @@ export default function SocialShell({
   const [storyViewerIndex, setStoryViewerIndex] = useState(null);
   const [viewedStories, setViewedStories] = useState({});
   const [storyReply, setStoryReply] = useState("");
+  const [events, setEvents] = useState([]);
+  const [myEventIds, setMyEventIds] = useState(new Set());
   const photoInputRef = useRef(null);
   const videoInputRef = useRef(null);
   const storyPhotoInputRef = useRef(null);
@@ -100,6 +102,73 @@ export default function SocialShell({
       });
     return () => { alive = false; };
   }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    let alive = true;
+    supabase
+      .from("events")
+      .select("id, title, description, location, event_date, event_attendees(count)")
+      .gte("event_date", new Date().toISOString())
+      .order("event_date", { ascending: true })
+      .limit(10)
+      .then(({ data, error }) => {
+        if (!alive) return;
+        if (error) { console.error(error.message, error.code, error.details, error.hint); return; }
+        setEvents((data || []).map((e) => ({
+          ...e,
+          attendeeCount: e.event_attendees?.[0]?.count || 0,
+        })));
+      });
+    supabase
+      .from("event_attendees")
+      .select("event_id")
+      .eq("profile_id", currentUser.id)
+      .then(({ data, error }) => {
+        if (!alive) return;
+        if (error) { console.error(error.message, error.code, error.details, error.hint); return; }
+        setMyEventIds(new Set((data || []).map((r) => r.event_id)));
+      });
+    return () => { alive = false; };
+  }, [currentUser]);
+
+  const toggleEventAttendance = async (event) => {
+    if (!currentUser) return;
+    const attending = myEventIds.has(event.id);
+    setMyEventIds((prev) => {
+      const next = new Set(prev);
+      attending ? next.delete(event.id) : next.add(event.id);
+      return next;
+    });
+    setEvents((prev) => prev.map((e) =>
+      e.id === event.id ? { ...e, attendeeCount: e.attendeeCount + (attending ? -1 : 1) } : e
+    ));
+    try {
+      if (attending) {
+        const { error } = await supabase
+          .from("event_attendees")
+          .delete()
+          .eq("event_id", event.id)
+          .eq("profile_id", currentUser.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("event_attendees")
+          .insert({ event_id: event.id, profile_id: currentUser.id });
+        if (error) throw error;
+      }
+    } catch (e) {
+      console.error(e.message, e.code, e.details, e.hint);
+      setMyEventIds((prev) => {
+        const next = new Set(prev);
+        attending ? next.add(event.id) : next.delete(event.id);
+        return next;
+      });
+      setEvents((prev) => prev.map((ev) =>
+        ev.id === event.id ? { ...ev, attendeeCount: ev.attendeeCount + (attending ? 1 : -1) } : ev
+      ));
+    }
+  };
 
   const [swipeX, setSwipeX] = useState(0);
   const [swiping, setSwiping] = useState(false);
@@ -497,6 +566,9 @@ export default function SocialShell({
             handlePass={handlePass}
             nearbyMembers={nearbyMembers}
             newArrivals={newArrivals}
+            events={events}
+            myEventIds={myEventIds}
+            toggleEventAttendance={toggleEventAttendance}
             communities={communities}
             matches={matches}
             openChat={openChat}
