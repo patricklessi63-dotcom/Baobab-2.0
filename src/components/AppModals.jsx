@@ -4,14 +4,24 @@ import { C } from "../constants";
 import { PrivacyPolicyContent, TermsOfServiceContent } from "../legalContent";
 import Avatar from "./Avatar";
 import PrivacyFieldsModal from "./PrivacyFieldsModal";
+import ReportModal from "./social/ReportModal";
+import BlockConfirmModal from "./social/BlockConfirmModal";
 
 export default function AppModals({
   reportTarget,
   setReportTarget,
   reportReason,
   setReportReason,
+  reportCategory,
+  setReportCategory,
   reportSending,
+  reportSubmitted,
   submitReport,
+  cancelReport,
+  dismissReportAfterSubmit,
+  blockTarget,
+  setBlockTarget,
+  confirmBlock,
   settingsOpen,
   setSettingsOpen,
   currentUser,
@@ -31,43 +41,26 @@ export default function AppModals({
   return (
     <>
       {/* ---------- MODAL SIGNALEMENT ---------- */}
-      {reportTarget && (
-        <div className="bb-fade-in fixed inset-0 flex items-center justify-center z-30" style={{ background: "rgba(20,29,56,0.55)", backdropFilter: "blur(3px)" }}>
-          <div className="bb-card p-6 max-w-xs mx-4 w-full" style={{ boxShadow: "var(--bb-shadow-lg)" }}>
-            <div style={{ fontFamily: "'Fraunces', serif", fontStyle: "italic", fontSize: 20, color: C.indigo }} className="mb-1">
-              Signaler {reportTarget.name}
-            </div>
-            <p className="text-sm mb-3" style={{ color: "rgba(43,36,32,0.6)" }}>
-              Explique brièvement pourquoi. On examinera ton signalement.
-            </p>
-            <textarea
-              value={reportReason}
-              onChange={(e) => setReportReason(e.target.value)}
-              rows={3}
-              placeholder="Ex : comportement déplacé, faux profil..."
-              className="w-full p-3 rounded-lg text-sm mb-3"
-              style={{ border: "1px solid rgba(43,36,32,0.15)" }}
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setReportTarget(null); setReportReason(""); }}
-                className="flex-1 py-2.5 rounded-full text-sm font-semibold"
-                style={{ border: "1px solid rgba(43,36,32,0.15)", color: C.ink }}
-              >
-                Annuler
-              </button>
-              <button
-                onClick={submitReport}
-                disabled={reportSending || !reportReason.trim()}
-                className="flex-1 py-2.5 rounded-full text-sm font-semibold disabled:opacity-60"
-                style={{ background: C.clay, color: "#fff" }}
-              >
-                {reportSending ? "Envoi..." : "Envoyer"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ReportModal
+        target={reportTarget}
+        category={reportCategory}
+        setCategory={setReportCategory}
+        reason={reportReason}
+        setReason={setReportReason}
+        sending={reportSending}
+        submitted={reportSubmitted}
+        onCancel={cancelReport}
+        onSubmit={submitReport}
+        onBlockAlso={(target) => { dismissReportAfterSubmit(); setBlockTarget(target); }}
+        onDismissAfterSubmit={dismissReportAfterSubmit}
+      />
+
+      {/* ---------- MODAL CONFIRMATION DE BLOCAGE ---------- */}
+      <BlockConfirmModal
+        target={blockTarget}
+        onCancel={() => setBlockTarget(null)}
+        onConfirm={confirmBlock}
+      />
 
       {/* ---------- MODAL PARAMÈTRES ---------- */}
       {settingsOpen && (

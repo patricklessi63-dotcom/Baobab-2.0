@@ -126,6 +126,7 @@ export function computeMatch(currentUser, candidate) {
   if (!currentUser || !candidate) {
     return {
       score: 0, level: "unknown", reasons: [], commonInterests: [], compatibleIntentions: false,
+      sharedIntentions: [], locationLabel: null,
       breakdown: {}, disclaimer: DISCLAIMER, source: "rules-v2",
     };
   }
@@ -181,6 +182,8 @@ export function computeMatch(currentUser, candidate) {
     reasons,
     commonInterests: interests.shared,
     compatibleIntentions: intentions.compatibleIntentions,
+    sharedIntentions: intentions.shared,
+    locationLabel: location.label,
     breakdown,
     disclaimer: DISCLAIMER,
     source: "rules-v2",

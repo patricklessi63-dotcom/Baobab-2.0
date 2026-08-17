@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from "react";
 import { Home, Heart, X, MessageCircle, LogOut, MoreVertical, Settings, UserRound, Search, Bell, Camera } from "lucide-react";
 import Avatar from "./Avatar";
 import { supabase } from "../supabaseClient";
+import { matchKey } from "../utils/format";
 import { primary, green, coral, gold, bg, muted, buttonBase } from "./social/theme";
 import FeedTab from "./social/FeedTab";
 import DiscoverTab from "./social/DiscoverTab";
-import MatchesTab from "./social/MatchesTab";
+import MessagesTab from "./social/MessagesTab";
 import StoriesTab from "./social/StoriesTab";
 import ProfileTab from "./social/ProfileTab";
 import PostComposerModal from "./social/PostComposerModal";
@@ -30,6 +31,7 @@ export default function SocialShell({
   candidates = [],
   getMatches = () => [],
   openChat = () => {},
+  closeChat = () => {},
   handleLike = () => {},
   handlePass = () => {},
   profilePhotos = {},
@@ -38,6 +40,17 @@ export default function SocialShell({
   handleBlock = () => {},
   profiles = [],
   handleSavePreferences = () => {},
+  activeMatch = null,
+  messages = [],
+  hasMoreHistory = false,
+  loadingOlder = false,
+  onLoadOlder = () => {},
+  messageDraft = "",
+  setMessageDraft = () => {},
+  broadcastTyping = () => {},
+  sendMessage = () => {},
+  retrySend = () => {},
+  otherTyping = false,
 }) {
   const [favoritesOpen, setFavoritesOpen] = useState(false);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
@@ -287,6 +300,94 @@ export default function SocialShell({
   const swipeStartRef = useRef(0);
 
   const matches = getMatches();
+  const matchIdsKey = matches.map((m) => m.id).sort().join(",");
+
+  const [lastByKey, setLastByKey] = useState({});
+  const [unreadByKey, setUnreadByKey] = useState({});
+  const [recentEvents, setRecentEvents] = useState([]);
+
+  // Aperçu du dernier message + compte de non-lus par conversation — une
+  // seule requête bornée, sans nouvelle table (voir plan Phase 5).
+  useEffect(() => {
+    if (!currentUser || !matchIdsKey) { setLastByKey({}); setUnreadByKey({}); return; }
+    let alive = true;
+    const keys = matchIdsKey.split(",").map((id) => matchKey(currentUser.id, id));
+    supabase
+      .from("messages")
+      .select("id, match_key, from_id, text, created_at, read_at")
+      .in("match_key", keys)
+      .order("created_at", { ascending: false })
+      .limit(500)
+      .then(({ data, error }) => {
+        if (!alive) return;
+        if (error) { console.error(error.message, error.code, error.details, error.hint); return; }
+        const lastMap = {}, unreadMap = {};
+        for (const m of data || []) {
+          if (!lastMap[m.match_key]) lastMap[m.match_key] = m;
+          if (m.from_id !== currentUser.id && !m.read_at) unreadMap[m.match_key] = (unreadMap[m.match_key] || 0) + 1;
+        }
+        setLastByKey(lastMap);
+        setUnreadByKey(unreadMap);
+      });
+    return () => { alive = false; };
+  }, [currentUser, matchIdsKey]);
+
+  // Canal temps réel global — reçoit tout nouveau message dont l'utilisateur
+  // est participant (la RLS de "messages" borne déjà la diffusion), pour que
+  // la liste et les badges non lus restent à jour même hors d'une
+  // conversation ouverte. Distinct du canal par-conversation dans App.jsx.
+  useEffect(() => {
+    if (!currentUser) return;
+    const channel = supabase
+      .channel(`global-messages:${currentUser.id}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
+        const m = payload.new;
+        setLastByKey((prev) => {
+          const existing = prev[m.match_key];
+          if (existing && new Date(existing.created_at) >= new Date(m.created_at)) return prev;
+          return { ...prev, [m.match_key]: m };
+        });
+        if (m.from_id !== currentUser.id) {
+          setUnreadByKey((prev) => ({ ...prev, [m.match_key]: (prev[m.match_key] || 0) + 1 }));
+          setRecentEvents((prev) => [{ type: "message", matchKey: m.match_key, preview: m.text, at: m.created_at }, ...prev].slice(0, 10));
+        }
+      })
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [currentUser]);
+
+  // La conversation ouverte est marquée lue côté serveur par App.jsx —
+  // on reflète ça immédiatement ici pour que le badge ne reste pas bloqué.
+  useEffect(() => {
+    if (!activeMatch || !currentUser) return;
+    const key = matchKey(currentUser.id, activeMatch.id);
+    setUnreadByKey((prev) => (prev[key] ? { ...prev, [key]: 0 } : prev));
+  }, [activeMatch, currentUser, messages.length]);
+
+  // Ouvrir un chat depuis n'importe où (célébration de match, carte, etc.)
+  // doit toujours amener sur l'onglet Messages.
+  useEffect(() => {
+    if (activeMatch) setTab("matches");
+  }, [activeMatch]);
+
+  const [incomingFavoritesCount, setIncomingFavoritesCount] = useState(0);
+  useEffect(() => {
+    if (!currentUser) return;
+    let alive = true;
+    supabase
+      .from("favorites")
+      .select("from_id")
+      .eq("to_id", currentUser.id)
+      .then(({ data, error }) => {
+        if (!alive) return;
+        if (error) { console.error(error.message, error.code, error.details, error.hint); return; }
+        setIncomingFavoritesCount((data || []).length);
+      });
+    return () => { alive = false; };
+  }, [currentUser]);
+
+  const totalUnreadMessages = Object.values(unreadByKey).reduce((sum, n) => sum + n, 0);
+
   const viewedProfile = viewedProfileId
     ? profiles.find((p) => p.id === viewedProfileId)
       || [...candidates, ...matches].find((p) => p.id === viewedProfileId)
@@ -632,16 +733,34 @@ export default function SocialShell({
           </div>
 
           <div className="flex items-center gap-2 shrink-0 relative">
-            <button onClick={() => { setNotificationsOpen((v) => !v); setMenu(false); }} aria-label="Notifications" className={`${buttonBase} h-11 w-11 rounded-2xl hidden sm:flex items-center justify-center relative focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1`} style={{ background: bg }}>
+            <button onClick={() => { setNotificationsOpen((v) => !v); setMenu(false); }} aria-label={`Notifications${totalUnreadMessages > 0 ? ` (${totalUnreadMessages} non lus)` : ""}`} className={`${buttonBase} h-11 w-11 rounded-2xl hidden sm:flex items-center justify-center relative focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1`} style={{ background: bg }}>
               <Bell size={19} color={primary} />
+              {(totalUnreadMessages > 0 || incomingFavoritesCount > 0) && (
+                <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full" style={{ background: coral }} />
+              )}
             </button>
             {notificationsOpen && (
               <div className="absolute right-12 top-14 w-80 bg-white rounded-2xl border shadow-2xl p-3 z-50">
                 <div className="flex items-center justify-between px-2 pb-2"><b>Notifications</b></div>
-                <div className="p-6 text-center">
-                  <Bell size={22} className="mx-auto mb-2" color={muted} />
-                  <p className="text-xs" style={{ color: muted }}>Aucune notification pour l'instant.</p>
-                </div>
+                {recentEvents.length === 0 && incomingFavoritesCount === 0 ? (
+                  <div className="p-6 text-center">
+                    <Bell size={22} className="mx-auto mb-2" color={muted} />
+                    <p className="text-xs" style={{ color: muted }}>Aucune notification pour l'instant.</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-1 max-h-72 overflow-y-auto">
+                    {incomingFavoritesCount > 0 && (
+                      <div className="px-2 py-2.5 rounded-xl text-sm" style={{ background: "#FFF3D6" }}>
+                        ⭐ {incomingFavoritesCount} personne{incomingFavoritesCount > 1 ? "s" : ""} t'a{incomingFavoritesCount > 1 ? "" : ""} ajouté en favori.
+                      </div>
+                    )}
+                    {recentEvents.map((ev, i) => (
+                      <button key={i} onClick={() => { setNotificationsOpen(false); goTab("matches"); }} className="text-left px-2 py-2.5 rounded-xl text-sm hover:bg-slate-50">
+                        💬 {ev.preview}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             <button onClick={() => { setMenu((v) => !v); setNotificationsOpen(false); }} className={`${buttonBase} h-11 w-11 rounded-2xl flex items-center justify-center text-white font-black`} style={{ background: primary }}>
@@ -723,7 +842,28 @@ export default function SocialShell({
         )}
 
         {tab === "matches" && (
-          <MatchesTab matches={matches} goTab={goTab} openChat={openChat} onViewProfile={(p) => setViewedProfileId(p.id)} />
+          <MessagesTab
+            matches={matches}
+            currentUser={currentUser}
+            activeMatch={activeMatch}
+            onSelectMatch={openChat}
+            onBack={closeChat}
+            goTab={goTab}
+            lastByKey={lastByKey}
+            unreadByKey={unreadByKey}
+            messages={messages}
+            hasMoreHistory={hasMoreHistory}
+            loadingOlder={loadingOlder}
+            onLoadOlder={onLoadOlder}
+            messageDraft={messageDraft}
+            setMessageDraft={setMessageDraft}
+            broadcastTyping={broadcastTyping}
+            sendMessage={sendMessage}
+            retrySend={retrySend}
+            otherTyping={otherTyping}
+            onOpenReport={setReportTarget}
+            onOpenBlockConfirm={handleBlock}
+          />
         )}
 
         {tab === "stories" && (
@@ -753,9 +893,14 @@ export default function SocialShell({
       <nav className="fixed bottom-0 left-0 right-0 z-40 bb-glass border-t" style={{ borderColor: "rgba(21,27,61,.08)", paddingBottom: "env(safe-area-inset-bottom)" }}>
         <div className="max-w-xl mx-auto grid grid-cols-5 px-2">
           {nav.map(([key, Icon, label]) => (
-            <button key={key} onClick={() => goTab(key)} className="py-3 flex flex-col items-center gap-1.5 rounded-2xl" style={{ minHeight: 48 }}>
-              <div className="h-7 w-9 flex items-center justify-center rounded-xl" style={{ background: tab === key ? "rgba(225,107,93,.11)" : "transparent" }}>
+            <button key={key} onClick={() => goTab(key)} aria-label={key === "matches" && totalUnreadMessages > 0 ? `${label} (${totalUnreadMessages} non lus)` : label} className="py-3 flex flex-col items-center gap-1.5 rounded-2xl" style={{ minHeight: 48 }}>
+              <div className="h-7 w-9 flex items-center justify-center rounded-xl relative" style={{ background: tab === key ? "rgba(225,107,93,.11)" : "transparent" }}>
                 <Icon size={19} color={tab === key ? coral : muted} fill={tab === key && key === "discover" ? coral : "none"} />
+                {key === "matches" && totalUnreadMessages > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 rounded-full text-[9px] font-black text-white flex items-center justify-center" style={{ background: coral }}>
+                    {totalUnreadMessages}
+                  </span>
+                )}
               </div>
               <span className="text-[10px] font-black" style={{ color: tab === key ? primary : muted }}>{label}</span>
             </button>

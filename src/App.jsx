@@ -10,7 +10,6 @@ import SocialShell from "./components/SocialShell";
 import AppModals from "./components/AppModals";
 import CreateProfileForm from "./screens/CreateProfileForm";
 import EditProfileForm from "./screens/EditProfileForm";
-import ChatScreen from "./screens/ChatScreen";
 import UpdatePasswordScreen from "./screens/UpdatePasswordScreen";
 import OnboardingWizard from "./screens/onboarding/OnboardingWizard";
 import { computeAge } from "./screens/onboarding/steps/Step1Identity";
@@ -19,7 +18,7 @@ import { filterCandidatesByPreferences } from "./lib/matching/matchingService";
 
 export default function App() {
   const [session, setSession] = useState(undefined); // undefined = pas encore vérifié, null = pas connecté
-  const [view, setView] = useState("loading"); // loading | form | feed | discover | matches | chat | stories
+  const [view, setView] = useState("loading"); // loading | form | feed | discover | matches | stories
   const [profiles, setProfiles] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [likePairs, setLikePairs] = useState([]); // [{from_id, to_id}]
@@ -36,7 +35,13 @@ export default function App() {
   const [menuOpenFor, setMenuOpenFor] = useState(null); // id du profil dont le menu ⋮ est ouvert
   const [reportTarget, setReportTarget] = useState(null); // profil en cours de signalement
   const [reportReason, setReportReason] = useState("");
+  const [reportCategory, setReportCategory] = useState("");
   const [reportSending, setReportSending] = useState(false);
+  const [reportSubmitted, setReportSubmitted] = useState(false);
+  const [blockTarget, setBlockTarget] = useState(null); // profil en attente de confirmation de blocage
+  const [successNotice, setSuccessNotice] = useState("");
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
@@ -224,7 +229,7 @@ export default function App() {
     );
   }, [profiles, likePairs, blockPairs, currentUser]);
 
-  async function handleBlock(target) {
+  async function performBlock(target) {
     if (!currentUser) return;
     try {
       const { error: blockError } = await supabase
@@ -235,12 +240,24 @@ export default function App() {
       setMenuOpenFor(null);
       if (activeMatch?.id === target.id) {
         setActiveMatch(null);
-        setView("feed");
       }
     } catch (e) {
       console.error(e);
       setError("Impossible de bloquer ce profil.");
     }
+  }
+
+  // Ouvre la confirmation de blocage — ne bloque jamais immédiatement.
+  function requestBlock(target) {
+    setMenuOpenFor(null);
+    setBlockTarget(target);
+  }
+
+  async function confirmBlock(target) {
+    await performBlock(target);
+    setBlockTarget(null);
+    setSuccessNotice("Cette personne ne pourra plus interagir avec toi sur Baobab.");
+    setTimeout(() => setSuccessNotice(""), 4000);
   }
 
   async function handleUnblock(target) {
@@ -303,15 +320,15 @@ export default function App() {
   }
 
   async function submitReport() {
-    if (!currentUser || !reportTarget || !reportReason.trim()) return;
+    if (!currentUser || !reportTarget || !reportCategory) return;
+    if (reportCategory === "autre" && !reportReason.trim()) return;
     setReportSending(true);
     try {
       const { error: reportError } = await supabase
         .from("reports")
-        .insert({ from_id: currentUser.id, to_id: reportTarget.id, reason: reportReason.trim() });
+        .insert({ from_id: currentUser.id, to_id: reportTarget.id, reason: reportReason.trim() || null, category: reportCategory });
       if (reportError) throw reportError;
-      setReportTarget(null);
-      setReportReason("");
+      setReportSubmitted(true);
       setMenuOpenFor(null);
     } catch (e) {
       console.error(e);
@@ -319,6 +336,20 @@ export default function App() {
     } finally {
       setReportSending(false);
     }
+  }
+
+  function cancelReport() {
+    setReportTarget(null);
+    setReportReason("");
+    setReportCategory("");
+    setReportSubmitted(false);
+  }
+
+  function dismissReportAfterSubmit() {
+    setReportTarget(null);
+    setReportReason("");
+    setReportCategory("");
+    setReportSubmitted(false);
   }
 
   async function uploadPhoto(userId, file, idx = 0) {
@@ -630,10 +661,31 @@ export default function App() {
     }
   }
 
+  const MESSAGES_PAGE_SIZE = 30;
+
   async function openChat(match) {
     setActiveMatch(match);
-    setView("chat");
+    setView("matches");
     await refreshMessages(match);
+  }
+
+  function closeChat() {
+    setActiveMatch(null);
+  }
+
+  async function markConversationRead(match) {
+    if (!currentUser || !match) return;
+    try {
+      const { error: readError } = await supabase
+        .from("messages")
+        .update({ read_at: new Date().toISOString() })
+        .eq("match_key", matchKey(currentUser.id, match.id))
+        .is("read_at", null)
+        .neq("from_id", currentUser.id);
+      if (readError) throw readError;
+    } catch (e) {
+      console.error(e.message, e.code, e.details, e.hint);
+    }
   }
 
   async function refreshMessages(match) {
@@ -643,18 +695,44 @@ export default function App() {
         .from("messages")
         .select("*")
         .eq("match_key", matchKey(currentUser.id, match.id))
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: false })
+        .limit(MESSAGES_PAGE_SIZE);
       if (msgError) throw msgError;
-      setMessages(data || []);
+      const chronological = (data || []).slice().reverse();
+      setMessages(chronological);
+      setHasMoreHistory((data || []).length === MESSAGES_PAGE_SIZE);
+      markConversationRead(match);
     } catch (e) {
       console.error(e);
       setMessages([]);
+      setHasMoreHistory(false);
     }
   }
 
-  async function sendMessage() {
-    if (!messageDraft.trim() || !currentUser || !activeMatch) return;
-    const text = messageDraft.trim();
+  async function loadOlderMessages() {
+    if (!currentUser || !activeMatch || messages.length === 0 || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const oldest = messages[0]?.created_at;
+      const { data, error: olderError } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("match_key", matchKey(currentUser.id, activeMatch.id))
+        .lt("created_at", oldest)
+        .order("created_at", { ascending: false })
+        .limit(MESSAGES_PAGE_SIZE);
+      if (olderError) throw olderError;
+      const older = (data || []).slice().reverse();
+      setMessages((m) => [...older, ...m]);
+      setHasMoreHistory((data || []).length === MESSAGES_PAGE_SIZE);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingOlder(false);
+    }
+  }
+
+  async function sendMessageText(text, tempId) {
     try {
       const { data, error: sendError } = await supabase
         .from("messages")
@@ -666,12 +744,36 @@ export default function App() {
         .select()
         .single();
       if (sendError) throw sendError;
-      setMessages((m) => [...m, data]);
-      setMessageDraft("");
+      setMessages((m) => {
+        const withoutRealtimeDupe = m.filter((msg) => msg.id !== data.id);
+        return withoutRealtimeDupe.map((msg) => (msg.id === tempId ? data : msg));
+      });
     } catch (e) {
       console.error(e);
-      setError("Message non envoyé, réessaie.");
+      setMessages((m) => m.map((msg) => (msg.id === tempId ? { ...msg, _status: "failed" } : msg)));
     }
+  }
+
+  function sendMessage() {
+    if (!messageDraft.trim() || !currentUser || !activeMatch) return;
+    const text = messageDraft.trim();
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setMessages((m) => [...m, {
+      id: tempId,
+      match_key: matchKey(currentUser.id, activeMatch.id),
+      from_id: currentUser.id,
+      text,
+      created_at: new Date().toISOString(),
+      read_at: null,
+      _status: "sending",
+    }]);
+    setMessageDraft("");
+    sendMessageText(text, tempId);
+  }
+
+  function retrySend(msg) {
+    setMessages((m) => m.map((x) => (x.id === msg.id ? { ...x, _status: "sending" } : x)));
+    sendMessageText(msg.text, msg.id);
   }
 
   // Messages en direct + indicateur "en train d'écrire" pour la conversation active
@@ -697,6 +799,7 @@ export default function App() {
         { event: "INSERT", schema: "public", table: "messages", filter: `match_key=eq.${key}` },
         (payload) => {
           setMessages((prev) => (prev.some((m) => m.id === payload.new.id) ? prev : [...prev, payload.new]));
+          if (payload.new.from_id !== currentUser.id) markConversationRead(activeMatch);
         }
       )
       .subscribe();
@@ -750,7 +853,34 @@ export default function App() {
   if (currentUser && ["feed", "stories", "profile", "discover", "matches"].includes(view)) {
     return (
       <>
-        <SocialShell currentUser={currentUser} setView={setView} handleSignOut={handleSignOut} candidates={candidates} getMatches={getMatches} openChat={openChat} handleLike={handleLike} handlePass={handlePass} profilePhotos={profilePhotos} openEditProfile={openEditProfile} setReportTarget={setReportTarget} handleBlock={handleBlock} profiles={profiles} handleSavePreferences={handleSavePreferences} />
+        <SocialShell
+          currentUser={currentUser}
+          setView={setView}
+          handleSignOut={handleSignOut}
+          candidates={candidates}
+          getMatches={getMatches}
+          openChat={openChat}
+          closeChat={closeChat}
+          handleLike={handleLike}
+          handlePass={handlePass}
+          profilePhotos={profilePhotos}
+          openEditProfile={openEditProfile}
+          setReportTarget={setReportTarget}
+          handleBlock={requestBlock}
+          profiles={profiles}
+          handleSavePreferences={handleSavePreferences}
+          activeMatch={activeMatch}
+          messages={messages}
+          hasMoreHistory={hasMoreHistory}
+          loadingOlder={loadingOlder}
+          onLoadOlder={loadOlderMessages}
+          messageDraft={messageDraft}
+          setMessageDraft={setMessageDraft}
+          broadcastTyping={broadcastTyping}
+          sendMessage={sendMessage}
+          retrySend={retrySend}
+          otherTyping={otherTyping}
+        />
         {matchNotice && (
           <MatchCelebrationModal
             match={matchNotice}
@@ -759,6 +889,40 @@ export default function App() {
             onDismiss={() => setMatchNotice(null)}
           />
         )}
+        {successNotice && (
+          <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[95] px-4 py-3 rounded-2xl text-sm font-semibold text-white shadow-xl" style={{ background: "#151B3D" }}>
+            {successNotice}
+          </div>
+        )}
+        <AppModals
+          reportTarget={reportTarget}
+          setReportTarget={setReportTarget}
+          reportReason={reportReason}
+          setReportReason={setReportReason}
+          reportCategory={reportCategory}
+          setReportCategory={setReportCategory}
+          reportSending={reportSending}
+          reportSubmitted={reportSubmitted}
+          submitReport={submitReport}
+          cancelReport={cancelReport}
+          dismissReportAfterSubmit={dismissReportAfterSubmit}
+          blockTarget={blockTarget}
+          setBlockTarget={setBlockTarget}
+          confirmBlock={confirmBlock}
+          settingsOpen={settingsOpen}
+          setSettingsOpen={setSettingsOpen}
+          currentUser={currentUser}
+          onToggleOnlineStatus={handleToggleOnlineStatus}
+          onToggleField={handleToggleField}
+          blockedProfiles={blockedProfiles}
+          onUnblock={handleUnblock}
+          privacyOpen={privacyOpen}
+          setPrivacyOpen={setPrivacyOpen}
+          termsOpen={termsOpen}
+          setTermsOpen={setTermsOpen}
+          aboutOpen={aboutOpen}
+          setAboutOpen={setAboutOpen}
+        />
       </>
     );
   }
@@ -901,25 +1065,6 @@ export default function App() {
           />
         )}
 
-        {/* ---------- CHAT ---------- */}
-        {view === "chat" && activeMatch && (
-          <ChatScreen
-            activeMatch={activeMatch}
-            setView={setView}
-            currentUser={currentUser}
-            otherTyping={otherTyping}
-            refreshMessages={refreshMessages}
-            menuOpenFor={menuOpenFor}
-            setMenuOpenFor={setMenuOpenFor}
-            setReportTarget={setReportTarget}
-            handleBlock={handleBlock}
-            messages={messages}
-            messageDraft={messageDraft}
-            setMessageDraft={setMessageDraft}
-            broadcastTyping={broadcastTyping}
-            sendMessage={sendMessage}
-          />
-        )}
       </div>
 
       <AppModals
@@ -927,8 +1072,16 @@ export default function App() {
         setReportTarget={setReportTarget}
         reportReason={reportReason}
         setReportReason={setReportReason}
+        reportCategory={reportCategory}
+        setReportCategory={setReportCategory}
         reportSending={reportSending}
+        reportSubmitted={reportSubmitted}
         submitReport={submitReport}
+        cancelReport={cancelReport}
+        dismissReportAfterSubmit={dismissReportAfterSubmit}
+        blockTarget={blockTarget}
+        setBlockTarget={setBlockTarget}
+        confirmBlock={confirmBlock}
         settingsOpen={settingsOpen}
         setSettingsOpen={setSettingsOpen}
         currentUser={currentUser}
