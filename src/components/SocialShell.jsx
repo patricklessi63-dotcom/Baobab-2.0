@@ -11,6 +11,7 @@ import ProfileTab from "./social/ProfileTab";
 import PostComposerModal from "./social/PostComposerModal";
 import StoryViewerModal from "./social/StoryViewerModal";
 import StoryComposerModal from "./social/StoryComposerModal";
+import EventComposerModal from "./social/EventComposerModal";
 
 const STORY_COLORS = ["#E56B5D", "#2F8F6B", "#5667A9", "#F2B84B", "#C1613D", "#1E2A4F"];
 function colorForProfile(id) {
@@ -59,6 +60,14 @@ export default function SocialShell({
   const [storyReply, setStoryReply] = useState("");
   const [events, setEvents] = useState([]);
   const [myEventIds, setMyEventIds] = useState(new Set());
+  const [eventComposer, setEventComposer] = useState(false);
+  const [eventTitle, setEventTitle] = useState("");
+  const [eventLocation, setEventLocation] = useState("");
+  const [eventDate, setEventDate] = useState("");
+  const [eventTime, setEventTime] = useState("");
+  const [eventDescription, setEventDescription] = useState("");
+  const [eventError, setEventError] = useState("");
+  const [eventSubmitting, setEventSubmitting] = useState(false);
   const photoInputRef = useRef(null);
   const videoInputRef = useRef(null);
   const storyPhotoInputRef = useRef(null);
@@ -167,6 +176,49 @@ export default function SocialShell({
       setEvents((prev) => prev.map((ev) =>
         ev.id === event.id ? { ...ev, attendeeCount: ev.attendeeCount + (attending ? 1 : -1) } : ev
       ));
+    }
+  };
+
+  const createEvent = async () => {
+    if (!currentUser) return;
+    const title = eventTitle.trim();
+    const location = eventLocation.trim();
+    if (!title || !location || !eventDate || !eventTime) return;
+    setEventSubmitting(true);
+    setEventError("");
+    try {
+      const eventDateTime = new Date(`${eventDate}T${eventTime}`);
+      if (Number.isNaN(eventDateTime.getTime()) || eventDateTime < new Date()) {
+        setEventError("Choisis une date et une heure dans le futur.");
+        setEventSubmitting(false);
+        return;
+      }
+      const { data, error } = await supabase
+        .from("events")
+        .insert({
+          title,
+          location,
+          description: eventDescription.trim() || null,
+          event_date: eventDateTime.toISOString(),
+          created_by: currentUser.id,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      setEvents((prev) => [...prev, { ...data, attendeeCount: 0 }].sort(
+        (a, b) => new Date(a.event_date) - new Date(b.event_date)
+      ));
+      setEventTitle("");
+      setEventLocation("");
+      setEventDate("");
+      setEventTime("");
+      setEventDescription("");
+      setEventComposer(false);
+    } catch (e) {
+      console.error(e.message, e.code, e.details, e.hint);
+      setEventError("Impossible de créer l'événement. Réessaie.");
+    } finally {
+      setEventSubmitting(false);
     }
   };
 
@@ -569,6 +621,7 @@ export default function SocialShell({
             events={events}
             myEventIds={myEventIds}
             toggleEventAttendance={toggleEventAttendance}
+            setEventComposer={setEventComposer}
             communities={communities}
             matches={matches}
             openChat={openChat}
@@ -674,6 +727,24 @@ export default function SocialShell({
         storyPhotoInputRef={storyPhotoInputRef}
         storyVideoInputRef={storyVideoInputRef}
         addStory={addStory}
+      />
+
+      <EventComposerModal
+        eventComposer={eventComposer}
+        setEventComposer={setEventComposer}
+        eventTitle={eventTitle}
+        setEventTitle={setEventTitle}
+        eventLocation={eventLocation}
+        setEventLocation={setEventLocation}
+        eventDate={eventDate}
+        setEventDate={setEventDate}
+        eventTime={eventTime}
+        setEventTime={setEventTime}
+        eventDescription={eventDescription}
+        setEventDescription={setEventDescription}
+        eventError={eventError}
+        eventSubmitting={eventSubmitting}
+        createEvent={createEvent}
       />
     </div>
   );

@@ -34,6 +34,7 @@ export default function FeedTab({
   events,
   myEventIds,
   toggleEventAttendance,
+  setEventComposer,
   communities,
   matches,
   openChat,
@@ -197,8 +198,15 @@ export default function FeedTab({
           </div>
 
           {/* ---------- Événements ---------- */}
-          <div className="mb-5 mt-8">
+          <div className="mb-5 mt-8 flex items-center justify-between gap-3">
             <h2 className="text-xl font-black" style={{ color: primary }}>🎉 Événements</h2>
+            <button
+              onClick={() => setEventComposer(true)}
+              className="text-xs font-bold shrink-0 focus-visible:outline focus-visible:outline-2"
+              style={{ color: coral }}
+            >
+              + Créer un événement
+            </button>
           </div>
           {events.length === 0 ? (
             <div className={`${card} p-2`}>
