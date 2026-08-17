@@ -1,6 +1,16 @@
 import React from "react";
 import { ArrowLeft, Camera } from "lucide-react";
-import { C, LOOKING_FOR, EDUCATION_LEVELS, HAS_CHILDREN_OPTIONS, MAX_PHOTOS } from "../constants";
+import {
+  C, LOOKING_FOR_OPTIONS, RELATIONSHIP_VALUES_OPTIONS, EDUCATION_LEVELS, HAS_CHILDREN_OPTIONS,
+  IMMIGRATION_STATUS_OPTIONS, WANTS_CHILDREN_OPTIONS, FAMILY_IMPORTANCE_OPTIONS, CAREER_GOAL_OPTIONS,
+  GEOGRAPHIC_OPENNESS_OPTIONS, PERSONALITY_EVENING_OPTIONS, PERSONALITY_TRAVEL_OPTIONS,
+  RELATIONSHIP_NEEDS_OPTIONS, INTERESTS_OPTIONS, LANGUAGES_OPTIONS, LANGUAGE_LEVELS, MAX_PHOTOS,
+} from "../constants";
+import ChipSelect from "../components/ChipSelect";
+
+function hasIntimateIntent(lookingFor) {
+  return (lookingFor || []).some((v) => v.includes("Amour") || v.includes("Relation sérieuse"));
+}
 
 export default function EditProfileForm({
   setView,
@@ -18,6 +28,18 @@ export default function EditProfileForm({
   savingProfile,
   handleSaveProfile,
 }) {
+  const set = (patch) => setEditForm({ ...editForm, ...patch });
+  const languagesDetail = editForm.languagesDetail || [];
+
+  const toggleLanguage = (language) => {
+    const exists = languagesDetail.find((l) => l.language === language);
+    if (exists) set({ languagesDetail: languagesDetail.filter((l) => l.language !== language) });
+    else set({ languagesDetail: [...languagesDetail, { language, level: LANGUAGE_LEVELS[3] }] });
+  };
+  const setLanguageLevel = (language, level) => {
+    set({ languagesDetail: languagesDetail.map((l) => (l.language === language ? { ...l, level } : l)) });
+  };
+
   return (
     <div className="p-6 max-w-md mx-auto w-full">
       <button onClick={() => setView("discover")} className="flex items-center gap-1 text-sm mb-4" style={{ color: C.indigo }}>
@@ -91,50 +113,77 @@ export default function EditProfileForm({
           </p>
         </div>
 
-        <input placeholder="Prénom" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+        <p className="text-xs font-semibold" style={{ color: "rgba(43,36,32,0.55)" }}>Identité</p>
+        <input placeholder="Prénom" value={editForm.name} onChange={(e) => set({ name: e.target.value })}
           className="bb-input w-full text-sm" />
-        <input placeholder="Âge" type="number" value={editForm.age} onChange={(e) => setEditForm({ ...editForm, age: e.target.value })}
-          className="bb-input w-full text-sm" />
-        <input placeholder="Pays d'origine" value={editForm.country} onChange={(e) => setEditForm({ ...editForm, country: e.target.value })}
-          className="bb-input w-full text-sm" />
-        <input placeholder="Langues parlées" value={editForm.languages} onChange={(e) => setEditForm({ ...editForm, languages: e.target.value })}
-          className="bb-input w-full text-sm" />
-        <input placeholder="Ville (Canada)" value={editForm.city} onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
-          className="bb-input w-full text-sm" />
-        <input placeholder="Depuis quand au Canada ?" value={editForm.arrivedSince} onChange={(e) => setEditForm({ ...editForm, arrivedSince: e.target.value })}
+        <label className="text-xs" style={{ color: "rgba(43,36,32,0.5)" }}>Date de naissance (jamais affichée publiquement)</label>
+        <input type="date" value={editForm.birthDate} onChange={(e) => set({ birthDate: e.target.value })}
           className="bb-input w-full text-sm" />
 
-        <div className="flex gap-2 flex-wrap">
-          {LOOKING_FOR.map((opt) => (
-            <button type="button" key={opt} onClick={() => setEditForm({ ...editForm, lookingFor: opt })}
-              className={`bb-pill text-xs font-semibold px-3.5 py-2.5 rounded-full ${editForm.lookingFor === opt ? "bb-pill-active" : ""}`}>
-              {opt}
-            </button>
-          ))}
-        </div>
-
-        <input placeholder="Profession / métier" value={editForm.occupation} onChange={(e) => setEditForm({ ...editForm, occupation: e.target.value })}
+        <p className="text-xs font-semibold mt-2" style={{ color: "rgba(43,36,32,0.55)" }}>Localisation</p>
+        <input placeholder="Pays d'origine" value={editForm.country} onChange={(e) => set({ country: e.target.value })}
           className="bb-input w-full text-sm" />
-        <input placeholder="Centres d'intérêt" value={editForm.interests} onChange={(e) => setEditForm({ ...editForm, interests: e.target.value })}
+        <input placeholder="Province" value={editForm.province} onChange={(e) => set({ province: e.target.value })}
+          className="bb-input w-full text-sm" />
+        <input placeholder="Ville (Canada)" value={editForm.city} onChange={(e) => set({ city: e.target.value })}
           className="bb-input w-full text-sm" />
 
+        <p className="text-xs font-semibold mt-2" style={{ color: "rgba(43,36,32,0.55)" }}>🇨🇦 Parcours Canada</p>
+        <input placeholder="Depuis quand au Canada ?" value={editForm.arrivedSince} onChange={(e) => set({ arrivedSince: e.target.value })}
+          className="bb-input w-full text-sm" />
+        <ChipSelect options={IMMIGRATION_STATUS_OPTIONS} value={editForm.immigrationStatus} onChange={(v) => set({ immigrationStatus: v })} />
+        <input placeholder="Profession / métier" value={editForm.occupation} onChange={(e) => set({ occupation: e.target.value })}
+          className="bb-input w-full text-sm" />
         <div>
-          <p className="text-xs mb-1.5" style={{ color: "rgba(43,36,32,0.55)" }}>Niveau d'études</p>
-          <div className="flex gap-2 flex-wrap">
-            {EDUCATION_LEVELS.map((opt) => (
-              <button type="button" key={opt} onClick={() => setEditForm({ ...editForm, educationLevel: opt })}
-                className={`bb-pill text-xs font-semibold px-3.5 py-2.5 rounded-full ${editForm.educationLevel === opt ? "bb-pill-active" : ""}`}>
-                {opt}
+          <p className="text-xs mb-1.5" style={{ color: "rgba(43,36,32,0.55)" }}>Études</p>
+          <ChipSelect options={EDUCATION_LEVELS} value={editForm.educationLevel} onChange={(v) => set({ educationLevel: v })} />
+        </div>
+        <input placeholder="Ville d'arrivée au Canada (facultatif)" value={editForm.arrivalCity} onChange={(e) => set({ arrivalCity: e.target.value })}
+          className="bb-input w-full text-sm" />
+
+        <p className="text-xs font-semibold mt-2" style={{ color: "rgba(43,36,32,0.55)" }}>🗣️ Langues</p>
+        <div className="flex gap-2 flex-wrap">
+          {LANGUAGES_OPTIONS.map((lang) => {
+            const active = languagesDetail.some((l) => l.language === lang);
+            return (
+              <button type="button" key={lang} onClick={() => toggleLanguage(lang)} aria-pressed={active}
+                className={`bb-pill text-xs font-semibold px-3.5 py-2.5 rounded-full ${active ? "bb-pill-active" : ""}`}>
+                {lang}
               </button>
+            );
+          })}
+        </div>
+        {languagesDetail.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {languagesDetail.map(({ language, level }) => (
+              <div key={language} className="flex items-center justify-between gap-2 p-2.5 rounded-xl" style={{ background: "rgba(43,36,32,0.03)" }}>
+                <span className="text-sm font-semibold">{language}</span>
+                <select value={level} onChange={(e) => setLanguageLevel(language, e.target.value)}
+                  className="text-xs rounded-full px-2.5 py-1.5" style={{ border: "1px solid rgba(43,36,32,0.16)", background: "#fff" }}>
+                  {LANGUAGE_LEVELS.map((lv) => <option key={lv} value={lv}>{lv}</option>)}
+                </select>
+              </div>
             ))}
           </div>
-        </div>
+        )}
+
+        <p className="text-xs font-semibold mt-2" style={{ color: "rgba(43,36,32,0.55)" }}>Ce que tu recherches</p>
+        <ChipSelect options={LOOKING_FOR_OPTIONS} value={editForm.lookingFor} onChange={(v) => set({ lookingFor: v })} multi />
+        {hasIntimateIntent(editForm.lookingFor) && (
+          <>
+            <p className="text-xs mt-1" style={{ color: "rgba(43,36,32,0.55)" }}>Quel type de relation souhaites-tu ?</p>
+            <ChipSelect options={RELATIONSHIP_VALUES_OPTIONS} value={editForm.relationshipValues} onChange={(v) => set({ relationshipValues: v })} multi />
+          </>
+        )}
+
+        <p className="text-xs font-semibold mt-2" style={{ color: "rgba(43,36,32,0.55)" }}>Centres d'intérêt</p>
+        <ChipSelect options={INTERESTS_OPTIONS} value={editForm.interests} onChange={(v) => set({ interests: v })} multi max={10} />
 
         <div>
-          <p className="text-xs mb-1.5" style={{ color: "rgba(43,36,32,0.55)" }}>As-tu des enfants ?</p>
+          <p className="text-xs mb-1.5 mt-2" style={{ color: "rgba(43,36,32,0.55)" }}>As-tu déjà des enfants ?</p>
           <div className="flex gap-2">
             {HAS_CHILDREN_OPTIONS.map((opt) => (
-              <button type="button" key={opt} onClick={() => setEditForm({ ...editForm, hasChildren: opt })}
+              <button type="button" key={opt} onClick={() => set({ hasChildren: opt })}
                 className={`bb-pill text-xs font-semibold px-3.5 py-2.5 rounded-full ${editForm.hasChildren === opt ? "bb-pill-active" : ""}`}>
                 {opt}
               </button>
@@ -142,7 +191,23 @@ export default function EditProfileForm({
           </div>
         </div>
 
-        <textarea placeholder="Une courte bio..." value={editForm.bio} onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
+        <p className="text-xs font-semibold mt-2" style={{ color: "rgba(43,36,32,0.55)" }}>✨ Projet de vie (facultatif)</p>
+        <p className="text-xs" style={{ color: "rgba(43,36,32,0.5)" }}>Souhaites-tu avoir des enfants ?</p>
+        <ChipSelect options={WANTS_CHILDREN_OPTIONS} value={editForm.wantsChildren} onChange={(v) => set({ wantsChildren: v })} />
+        <p className="text-xs" style={{ color: "rgba(43,36,32,0.5)" }}>Importance de la famille</p>
+        <ChipSelect options={FAMILY_IMPORTANCE_OPTIONS} value={editForm.familyImportance} onChange={(v) => set({ familyImportance: v })} />
+        <p className="text-xs" style={{ color: "rgba(43,36,32,0.5)" }}>Projet professionnel</p>
+        <ChipSelect options={CAREER_GOAL_OPTIONS} value={editForm.careerGoal} onChange={(v) => set({ careerGoal: v })} />
+        <p className="text-xs" style={{ color: "rgba(43,36,32,0.5)" }}>Projet géographique</p>
+        <ChipSelect options={GEOGRAPHIC_OPENNESS_OPTIONS} value={editForm.geographicOpenness} onChange={(v) => set({ geographicOpenness: v })} />
+
+        <p className="text-xs font-semibold mt-2" style={{ color: "rgba(43,36,32,0.55)" }}>Personnalité</p>
+        <ChipSelect options={PERSONALITY_EVENING_OPTIONS} value={editForm.personalityEvening} onChange={(v) => set({ personalityEvening: v })} />
+        <ChipSelect options={PERSONALITY_TRAVEL_OPTIONS} value={editForm.personalityTravel} onChange={(v) => set({ personalityTravel: v })} />
+        <p className="text-xs" style={{ color: "rgba(43,36,32,0.5)" }}>Une bonne relation repose surtout sur (max 2)</p>
+        <ChipSelect options={RELATIONSHIP_NEEDS_OPTIONS} value={editForm.relationshipNeeds} onChange={(v) => set({ relationshipNeeds: v })} multi max={2} />
+
+        <textarea placeholder="Une courte bio..." value={editForm.bio} onChange={(e) => set({ bio: e.target.value })}
           rows={3} className="bb-input w-full text-sm" />
 
         <button type="submit" disabled={savingProfile} className="bb-btn bb-btn-primary mt-2 py-3 rounded-full font-semibold text-sm">

@@ -12,6 +12,7 @@ import PostComposerModal from "./social/PostComposerModal";
 import StoryViewerModal from "./social/StoryViewerModal";
 import StoryComposerModal from "./social/StoryComposerModal";
 import EventComposerModal from "./social/EventComposerModal";
+import PublicProfileModal from "./social/PublicProfileModal";
 
 const STORY_COLORS = ["#E56B5D", "#2F8F6B", "#5667A9", "#F2B84B", "#C1613D", "#1E2A4F"];
 function colorForProfile(id) {
@@ -31,6 +32,8 @@ export default function SocialShell({
   handlePass = () => {},
   profilePhotos = {},
   openEditProfile = () => setView("editProfile"),
+  setReportTarget = () => {},
+  handleBlock = () => {},
 }) {
   const [tab, setTab] = useState("feed");
   const [profileTab, setProfileTab] = useState("posts");
@@ -60,6 +63,8 @@ export default function SocialShell({
   const [storyReply, setStoryReply] = useState("");
   const [events, setEvents] = useState([]);
   const [myEventIds, setMyEventIds] = useState(new Set());
+  const [viewedProfileId, setViewedProfileId] = useState(null);
+  const [favoriteIds, setFavoriteIds] = useState(new Set());
   const [eventComposer, setEventComposer] = useState(false);
   const [eventTitle, setEventTitle] = useState("");
   const [eventLocation, setEventLocation] = useState("");
@@ -140,6 +145,53 @@ export default function SocialShell({
       });
     return () => { alive = false; };
   }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    let alive = true;
+    supabase
+      .from("favorites")
+      .select("to_id")
+      .eq("from_id", currentUser.id)
+      .then(({ data, error }) => {
+        if (!alive) return;
+        if (error) { console.error(error.message, error.code, error.details, error.hint); return; }
+        setFavoriteIds(new Set((data || []).map((r) => r.to_id)));
+      });
+    return () => { alive = false; };
+  }, [currentUser]);
+
+  const toggleFavorite = async (profile) => {
+    if (!currentUser) return;
+    const isFav = favoriteIds.has(profile.id);
+    setFavoriteIds((prev) => {
+      const next = new Set(prev);
+      isFav ? next.delete(profile.id) : next.add(profile.id);
+      return next;
+    });
+    try {
+      if (isFav) {
+        const { error } = await supabase
+          .from("favorites")
+          .delete()
+          .eq("from_id", currentUser.id)
+          .eq("to_id", profile.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("favorites")
+          .insert({ from_id: currentUser.id, to_id: profile.id });
+        if (error) throw error;
+      }
+    } catch (e) {
+      console.error(e.message, e.code, e.details, e.hint);
+      setFavoriteIds((prev) => {
+        const next = new Set(prev);
+        isFav ? next.add(profile.id) : next.delete(profile.id);
+        return next;
+      });
+    }
+  };
 
   const toggleEventAttendance = async (event) => {
     if (!currentUser) return;
@@ -229,6 +281,10 @@ export default function SocialShell({
   const swipeStartRef = useRef(0);
 
   const matches = getMatches();
+  const viewedProfile = viewedProfileId
+    ? [...candidates, ...matches].find((p) => p.id === viewedProfileId) || null
+    : null;
+  const viewedProfileIsMatch = viewedProfile ? matches.some((m) => m.id === viewedProfile.id) : false;
 
   const firstName = currentUser?.name?.split(" ")[0] || "toi";
 
@@ -645,11 +701,12 @@ export default function SocialShell({
             onSwipeEnd={onSwipeEnd}
             decideSwipe={decideSwipe}
             currentUser={currentUser}
+            onViewProfile={(p) => setViewedProfileId(p.id)}
           />
         )}
 
         {tab === "matches" && (
-          <MatchesTab matches={matches} goTab={goTab} openChat={openChat} />
+          <MatchesTab matches={matches} goTab={goTab} openChat={openChat} onViewProfile={(p) => setViewedProfileId(p.id)} />
         )}
 
         {tab === "stories" && (
@@ -667,6 +724,7 @@ export default function SocialShell({
             setProfileTab={setProfileTab}
             setComposer={setComposer}
             goTab={goTab}
+            profilePhotos={profilePhotos}
           />
         )}
       </main>
@@ -746,6 +804,21 @@ export default function SocialShell({
         eventSubmitting={eventSubmitting}
         createEvent={createEvent}
       />
+
+      {viewedProfile && (
+        <PublicProfileModal
+          profile={viewedProfile}
+          photos={profilePhotos[viewedProfile.id] || []}
+          onClose={() => setViewedProfileId(null)}
+          isMatch={viewedProfileIsMatch}
+          isFavorite={favoriteIds.has(viewedProfile.id)}
+          onLike={viewedProfileIsMatch ? null : (p) => { handleLike(p); setViewedProfileId(null); }}
+          onMessage={(p) => { setViewedProfileId(null); openChat(p); }}
+          onToggleFavorite={toggleFavorite}
+          onReport={(p) => { setViewedProfileId(null); setReportTarget(p); }}
+          onBlock={(p) => { setViewedProfileId(null); handleBlock(p); }}
+        />
+      )}
     </div>
   );
 }

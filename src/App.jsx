@@ -12,6 +12,8 @@ import CreateProfileForm from "./screens/CreateProfileForm";
 import EditProfileForm from "./screens/EditProfileForm";
 import ChatScreen from "./screens/ChatScreen";
 import UpdatePasswordScreen from "./screens/UpdatePasswordScreen";
+import OnboardingWizard from "./screens/onboarding/OnboardingWizard";
+import { computeAge } from "./screens/onboarding/steps/Step1Identity";
 
 export default function App() {
   const [session, setSession] = useState(undefined); // undefined = pas encore vérifié, null = pas connecté
@@ -184,11 +186,15 @@ export default function App() {
     const own = profiles.find((p) => p.user_id === session.user.id);
     if (own) {
       setCurrentUser(own);
-      setDiscoverIdx(0);
-      setView("feed");
+      if (!own.onboarding_completed_at) {
+        setView("onboarding");
+      } else {
+        setDiscoverIdx(0);
+        setView("feed");
+      }
     } else {
       setCurrentUser(null);
-      setView("form");
+      setView("onboarding");
     }
   }, [view, profiles, session]);
 
@@ -265,6 +271,20 @@ export default function App() {
     }
   }
 
+  async function handleToggleField(field, checked) {
+    if (!currentUser) return;
+    setCurrentUser((u) => ({ ...u, [field]: checked }));
+    try {
+      const { error: toggleError } = await supabase
+        .from("profiles")
+        .update({ [field]: checked })
+        .eq("id", currentUser.id);
+      if (toggleError) throw toggleError;
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   async function submitReport() {
     if (!currentUser || !reportTarget || !reportReason.trim()) return;
     setReportSending(true);
@@ -330,16 +350,29 @@ export default function App() {
     setEditForm({
       name: currentUser.name || "",
       age: String(currentUser.age || ""),
+      birthDate: currentUser.birth_date || "",
       country: currentUser.country || "",
+      province: currentUser.province || "",
       languages: currentUser.languages || "",
+      languagesDetail: Array.isArray(currentUser.languages_detail) ? currentUser.languages_detail : [],
       city: currentUser.city || "",
       arrivedSince: currentUser.arrived_since || "",
-      lookingFor: currentUser.looking_for || LOOKING_FOR[0],
+      immigrationStatus: currentUser.immigration_status || "",
+      arrivalCity: currentUser.arrival_city || "",
+      lookingFor: (currentUser.looking_for || "").split(",").map((s) => s.trim()).filter(Boolean),
+      relationshipValues: (currentUser.relationship_values || "").split(",").map((s) => s.trim()).filter(Boolean),
       bio: currentUser.bio || "",
       occupation: currentUser.occupation || "",
-      interests: currentUser.interests || "",
+      interests: (currentUser.interests || "").split(",").map((s) => s.trim()).filter(Boolean),
       educationLevel: currentUser.education_level || EDUCATION_LEVELS[0],
       hasChildren: currentUser.has_children || HAS_CHILDREN_OPTIONS[1],
+      wantsChildren: currentUser.wants_children || "",
+      familyImportance: currentUser.family_importance || "",
+      careerGoal: currentUser.career_goal || "",
+      geographicOpenness: currentUser.geographic_openness || "",
+      personalityEvening: currentUser.personality_evening || "",
+      personalityTravel: currentUser.personality_travel || "",
+      relationshipNeeds: (currentUser.relationship_needs || "").split(",").map((s) => s.trim()).filter(Boolean),
     });
     setExistingPhotos(profilePhotos[currentUser.id] || []);
     setNewPhotoFiles([]);
@@ -382,9 +415,9 @@ export default function App() {
 
   async function handleSaveProfile(e) {
     e.preventDefault();
-    if (!editForm.name || !editForm.age || !currentUser) { setError("Nom et âge sont requis."); return; }
-    const editAgeNum = Number(editForm.age);
-    if (Number.isNaN(editAgeNum) || editAgeNum < 18) { setError("Tu dois avoir au moins 18 ans."); return; }
+    if (!editForm.name || !currentUser) { setError("Le nom est requis."); return; }
+    const editAgeNum = editForm.birthDate ? computeAge(editForm.birthDate) : Number(editForm.age);
+    if (editAgeNum === null || Number.isNaN(editAgeNum) || editAgeNum < 18) { setError("Tu dois avoir au moins 18 ans."); return; }
     setSavingProfile(true);
     try {
       const uploadedUrls = [];
@@ -418,17 +451,30 @@ export default function App() {
       const payload = {
         name: editForm.name,
         cover_url: coverUrl,
-        age: Number(editForm.age),
+        age: editAgeNum,
+        birth_date: editForm.birthDate || null,
         country: editForm.country,
-        languages: editForm.languages,
+        province: editForm.province,
+        languages: editForm.languagesDetail?.length ? editForm.languagesDetail.map((l) => l.language).join(", ") : editForm.languages,
+        languages_detail: editForm.languagesDetail || [],
         city: editForm.city,
         arrived_since: editForm.arrivedSince,
-        looking_for: editForm.lookingFor,
+        immigration_status: editForm.immigrationStatus,
+        arrival_city: editForm.arrivalCity,
+        looking_for: (editForm.lookingFor || []).join(", "),
+        relationship_values: (editForm.relationshipValues || []).join(", "),
         bio: editForm.bio,
         occupation: editForm.occupation,
-        interests: editForm.interests,
+        interests: (editForm.interests || []).join(", "),
         education_level: editForm.educationLevel,
         has_children: editForm.hasChildren,
+        wants_children: editForm.wantsChildren,
+        family_importance: editForm.familyImportance,
+        career_goal: editForm.careerGoal,
+        geographic_openness: editForm.geographicOpenness,
+        personality_evening: editForm.personalityEvening,
+        personality_travel: editForm.personalityTravel,
+        relationship_needs: (editForm.relationshipNeeds || []).join(", "),
         avatar_url: newAvatarUrl,
       };
       const { data, error: updateError } = await supabase
@@ -682,7 +728,7 @@ export default function App() {
   }
 
   if (currentUser && ["feed", "stories", "profile", "discover", "matches"].includes(view)) {
-    return <SocialShell currentUser={currentUser} setView={setView} handleSignOut={handleSignOut} candidates={candidates} getMatches={getMatches} openChat={openChat} handleLike={handleLike} handlePass={handlePass} profilePhotos={profilePhotos} openEditProfile={openEditProfile} />;
+    return <SocialShell currentUser={currentUser} setView={setView} handleSignOut={handleSignOut} candidates={candidates} getMatches={getMatches} openChat={openChat} handleLike={handleLike} handlePass={handlePass} profilePhotos={profilePhotos} openEditProfile={openEditProfile} setReportTarget={setReportTarget} handleBlock={handleBlock} />;
   }
 
   return (
@@ -704,7 +750,7 @@ export default function App() {
             prototype
           </span>
         </div>
-        {currentUser && view !== "editProfile" && (
+        {currentUser && view !== "editProfile" && view !== "onboarding" && (
           <div className="flex items-center gap-1" style={{ position: "relative" }}>
             <button onClick={openEditProfile} className="flex items-center gap-2">
               <div style={{ position: "relative" }}>
@@ -771,7 +817,26 @@ export default function App() {
       )}
 
       <div className="relative z-10 flex-1 flex flex-col">
-        {/* ---------- FORM (première connexion : pas encore de profil) ---------- */}
+        {/* ---------- ONBOARDING (Phase 3) — remplace l'ancien formulaire unique ---------- */}
+        {view === "onboarding" && (
+          <OnboardingWizard
+            session={session}
+            currentUser={currentUser}
+            setCurrentUser={setCurrentUser}
+            setProfiles={setProfiles}
+            setProfilePhotos={setProfilePhotos}
+            photoFiles={photoFiles}
+            photoPreviews={photoPreviews}
+            handlePhotosSelected={handlePhotosSelected}
+            removePhotoFile={removePhotoFile}
+            setPhotoFiles={setPhotoFiles}
+            setPhotoPreviews={setPhotoPreviews}
+            uploadPhoto={uploadPhoto}
+            setView={setView}
+          />
+        )}
+
+        {/* ---------- FORM (ancien formulaire unique — orphelin depuis l'onboarding, conservé pour l'instant) ---------- */}
         {view === "form" && (
           <CreateProfileForm
             form={form}
@@ -836,6 +901,7 @@ export default function App() {
         setSettingsOpen={setSettingsOpen}
         currentUser={currentUser}
         onToggleOnlineStatus={handleToggleOnlineStatus}
+        onToggleField={handleToggleField}
         blockedProfiles={blockedProfiles}
         onUnblock={handleUnblock}
         privacyOpen={privacyOpen}
@@ -847,7 +913,7 @@ export default function App() {
       />
 
       {/* Bottom nav */}
-      {currentUser && view !== "form" && view !== "editProfile" && (
+      {currentUser && view !== "form" && view !== "editProfile" && view !== "onboarding" && (
         <div className="relative z-20 flex justify-around py-2.5 px-3 bb-generic-glass" style={{ borderTop: "1px solid rgba(43,36,32,0.08)", boxShadow: "0 -1px 0 rgba(20,29,56,0.02)" }}>
           <button onClick={() => setView("discover")} className="bb-nav-btn flex flex-col items-center gap-1 text-xs py-1.5 px-4 rounded-xl"
             style={{ color: view === "discover" ? C.clay : "rgba(43,36,32,0.45)", background: view === "discover" ? "rgba(193,97,61,0.08)" : "transparent", fontWeight: view === "discover" ? 700 : 500 }}>

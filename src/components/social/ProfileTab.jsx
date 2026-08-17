@@ -2,7 +2,8 @@ import React from "react";
 import { Send, CheckCheck, Image as ImageIcon } from "lucide-react";
 import Avatar from "../Avatar";
 import VerifiedBadge from "../VerifiedBadge";
-import { primary, green, coral, bg, muted } from "./theme";
+import { getProfileCompletion } from "../../lib/profileCompletion";
+import { primary, green, coral, gold, bg, muted } from "./theme";
 
 export default function ProfileTab({
   currentUser,
@@ -14,17 +15,22 @@ export default function ProfileTab({
   setProfileTab,
   setComposer,
   goTab,
+  profilePhotos = {},
 }) {
-          const isComplete = Boolean(currentUser?.bio && currentUser?.occupation && currentUser?.languages);
           const myPosts = posts.filter((p) => p.name === currentUser?.name);
+          const completion = getProfileCompletion(currentUser, profilePhotos[currentUser?.id] || []);
+          const isComplete = completion.percent >= 100;
           const aboutRows = [
             ["Profession", currentUser?.occupation, "💼"],
             ["Niveau d'études", currentUser?.education_level, "🎓"],
             ["Langues parlées", currentUser?.languages, "🗣"],
             ["Pays d'origine", currentUser?.country, "🌍"],
+            ["Province", currentUser?.province, "🗺️"],
             ["Ville au Canada", currentUser?.city, "📍"],
             ["Au Canada depuis", currentUser?.arrived_since, "✈️"],
+            ["Statut", currentUser?.immigration_status, "🇨🇦"],
             ["Recherche", currentUser?.looking_for, "♡"],
+            ["Intentions", currentUser?.relationship_values, "❤️"],
             ["A des enfants", currentUser?.has_children, "👨‍👩‍👧"],
             ["Centres d'intérêt", currentUser?.interests, "✨"],
           ].filter(([, value]) => value);
@@ -60,6 +66,21 @@ export default function ProfileTab({
                   <button onClick={() => goTab("discover")} className="px-4 py-2.5 rounded-xl font-bold text-sm" style={{ background: "#FFF3F1", color: coral }}>Trouver des personnes</button>
                 </div>
                 {currentUser?.bio && <p className="text-sm leading-6 mt-5 max-w-2xl">{currentUser.bio}</p>}
+
+                {!isComplete && (
+                  <div className="mt-5 rounded-2xl p-4" style={{ background: bg }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-black uppercase tracking-wider" style={{ color: primary }}>Ton profil est complété à {completion.percent}%</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-white overflow-hidden mb-2">
+                      <div className="h-full rounded-full motion-safe:transition-[width] motion-safe:duration-300" style={{ width: `${completion.percent}%`, background: `linear-gradient(90deg,${gold},${green})` }} />
+                    </div>
+                    {completion.tips[0] && (
+                      <p className="text-xs" style={{ color: muted }}>💡 {completion.tips[0]}</p>
+                    )}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-3 gap-3 mt-6">
                   {[[matches.length, "Matchs"], [myPosts.length, "Publications"], [candidates.length, "Profils à découvrir"]].map(([value, label]) => <div key={label} className="rounded-2xl p-4 text-center" style={{ background: bg }}><b className="text-xl" style={{ color: primary }}>{value}</b><div className="text-[11px] mt-1" style={{ color: muted }}>{label}</div></div>)}
                 </div>

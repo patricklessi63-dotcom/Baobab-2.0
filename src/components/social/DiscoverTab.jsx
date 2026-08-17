@@ -18,6 +18,7 @@ export default function DiscoverTab({
   onSwipeEnd,
   decideSwipe,
   currentUser,
+  onViewProfile = () => {},
 }) {
   return (
           <section className="max-w-2xl mx-auto">
@@ -103,10 +104,15 @@ export default function DiscoverTab({
                         </div>
 
                         <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                          <div className="text-3xl font-black flex items-center gap-2">
+                          <button
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={() => onViewProfile(p)}
+                            className="text-3xl font-black flex items-center gap-2 text-left"
+                          >
                             {p.name}, {p.age}
                             <VerifiedBadge emailVerified={p.email_verified} phoneVerified={p.phone_verified} size={20} color="#fff" />
-                          </div>
+                          </button>
+                          <p className="text-xs text-white/60 mt-0.5">Toucher le nom pour voir le profil complet</p>
                           <div className="text-sm text-white/75 mt-1">📍 {p.city || "Canada"} · {p.occupation || "Nouveau membre"}</div>
                           {p.bio && <p className="text-sm text-white/80 mt-3 leading-6 max-w-lg">{p.bio}</p>}
                           <div className="flex flex-wrap gap-2 mt-4">

@@ -3,6 +3,7 @@ import { Circle, Bell, Moon, Shield, Info, ArrowLeft, ShieldCheck, Smartphone, U
 import { C } from "../constants";
 import { PrivacyPolicyContent, TermsOfServiceContent } from "../legalContent";
 import Avatar from "./Avatar";
+import PrivacyFieldsModal from "./PrivacyFieldsModal";
 
 export default function AppModals({
   reportTarget,
@@ -15,6 +16,7 @@ export default function AppModals({
   setSettingsOpen,
   currentUser,
   onToggleOnlineStatus,
+  onToggleField,
   blockedProfiles = [],
   onUnblock,
   privacyOpen,
@@ -25,6 +27,7 @@ export default function AppModals({
   setAboutOpen,
 }) {
   const [blockedOpen, setBlockedOpen] = React.useState(false);
+  const [privacyFieldsOpen, setPrivacyFieldsOpen] = React.useState(false);
   return (
     <>
       {/* ---------- MODAL SIGNALEMENT ---------- */}
@@ -99,6 +102,10 @@ export default function AppModals({
                 <ArrowLeft size={14} style={{ transform: "rotate(180deg)", color: "rgba(43,36,32,0.35)" }} />
               </span>
             </button>
+            <button onClick={() => { setSettingsOpen(false); setPrivacyFieldsOpen(true); }} className="w-full flex items-center justify-between py-3" style={{ borderTop: "1px solid rgba(43,36,32,0.08)", minHeight: 44 }}>
+              <span className="flex items-center gap-2 text-sm"><Shield size={14} color={C.indigo} /> Confidentialité des champs</span>
+              <ArrowLeft size={14} style={{ transform: "rotate(180deg)", color: "rgba(43,36,32,0.35)" }} />
+            </button>
 
             <div className="text-[11px] font-black uppercase tracking-wider mt-4" style={{ color: "rgba(43,36,32,0.4)" }}>Baobab Protect</div>
             <div className="flex items-center justify-between py-2.5" style={{ borderTop: "1px solid rgba(43,36,32,0.08)" }}>
@@ -126,6 +133,15 @@ export default function AppModals({
           </div>
         </div>
       )}
+
+      {/* ---------- MODAL CONFIDENTIALITÉ DES CHAMPS ---------- */}
+      <PrivacyFieldsModal
+        open={privacyFieldsOpen}
+        onClose={() => setPrivacyFieldsOpen(false)}
+        onBack={() => { setPrivacyFieldsOpen(false); setSettingsOpen(true); }}
+        currentUser={currentUser}
+        onToggleField={onToggleField}
+      />
 
       {/* ---------- MODAL COMPTES BLOQUÉS ---------- */}
       {blockedOpen && (

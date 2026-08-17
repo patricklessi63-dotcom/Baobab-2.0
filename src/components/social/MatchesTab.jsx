@@ -4,7 +4,7 @@ import Avatar from "../Avatar";
 import VerifiedBadge from "../VerifiedBadge";
 import { primary, green, coral, bg, muted, card, buttonBase } from "./theme";
 
-export default function MatchesTab({ matches, goTab, openChat }) {
+export default function MatchesTab({ matches, goTab, openChat, onViewProfile = () => {} }) {
   return (
           <section className="max-w-3xl mx-auto">
             <div className="mb-6"><div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wider" style={{ background: "#EEF8F4", color: green }}><MessageCircle size={13} /> Connexions réciproques</div><h1 className="text-3xl font-black mt-3" style={{ color: primary }}>Tes conversations</h1><p className="text-sm mt-1" style={{ color: muted }}>Quand le feeling est réciproque, la discussion commence ici.</p></div>
@@ -19,10 +19,17 @@ export default function MatchesTab({ matches, goTab, openChat }) {
               <div className="flex flex-col gap-1.5">
                 {matches.map((m) => (
                   <button key={m.id} onClick={() => openChat(m)} className={`${card} ${buttonBase} p-3.5 flex items-center gap-3.5 text-left w-full`}>
-                    <div className="relative flex-shrink-0">
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => { e.stopPropagation(); onViewProfile(m); }}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onViewProfile(m); } }}
+                      aria-label={`Voir le profil de ${m.name}`}
+                      className="relative flex-shrink-0"
+                    >
                       <Avatar name={m.name} url={m.avatar_url} size={54} />
                       <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white" style={{ background: m.is_online ? "#27C56D" : "#B9BEC9" }} />
-                    </div>
+                    </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-bold truncate flex items-center gap-1.5">{m.name}<VerifiedBadge emailVerified={m.email_verified} phoneVerified={m.phone_verified} size={13} /></span>
